@@ -1,0 +1,26 @@
+ARG PYTHON_BASE_IMAGE=python:3.11.15-slim-trixie@sha256:90744cff8f32887f075c47d747a173ff333e9e98801667af93c357fa9f5e28ff
+FROM ${PYTHON_BASE_IMAGE}
+
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates tzdata \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.runtime.lock /app/requirements.runtime.lock
+RUN python -m pip install --requirement /app/requirements.runtime.lock
+
+COPY backend /app/backend
+COPY optimizer /app/optimizer
+COPY frontend /app/frontend
+COPY database /app/database
+
+EXPOSE 8443
+
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8443", "--ssl-certfile", "/certs/server.crt", "--ssl-keyfile", "/certs/server.key", "--no-access-log"]

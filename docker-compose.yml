@@ -1,0 +1,83 @@
+name: ${COMPOSE_PROJECT_NAME:-siligent-scheduler}
+
+services:
+  database:
+    image: ${DATABASE_IMAGE:-postgres@sha256:20edbde7749f822887a1a022ad526fde0a47d6b2be9a8364433605cf65099416}
+    pull_policy: never
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - scheduler_database:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - scheduler_private
+
+  api:
+    image: ${API_IMAGE:-siligent-scheduler-api:local}
+    pull_policy: never
+    environment:
+      DATABASE_HOST: database
+      DATABASE_PORT: "5432"
+      DATABASE_NAME: ${POSTGRES_DB}
+      DATABASE_USER: ${POSTGRES_USER}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+      PRACTICE_NAME: ${PRACTICE_NAME:-Siligent Dental}
+      PRACTICE_TIMEZONE: ${PRACTICE_TIMEZONE:-America/New_York}
+      SCHEDULING_HORIZON_DAYS: ${SCHEDULING_HORIZON_DAYS:-365}
+      BOOTSTRAP_ADMIN_USERNAME: ${BOOTSTRAP_ADMIN_USERNAME:-admin}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:?BOOTSTRAP_ADMIN_PASSWORD is required}
+      SESSION_HOURS: ${SESSION_HOURS:-8}
+      COOKIE_SECURE: "true"
+      LOCAL_MODEL_ENABLED: ${LOCAL_MODEL_ENABLED:-false}
+      LOCAL_MODEL_URL: ${LOCAL_MODEL_URL:-http://host.docker.internal:11434/api/generate}
+      LOCAL_MODEL_ID: ${LOCAL_MODEL_ID:-qwen3.5:4b}
+      CALIBRATION_MIN_SAMPLES: ${CALIBRATION_MIN_SAMPLES:-20}
+      MIGRATION_DIR: /app/database/migrations
+      DISABLE_TELEMETRY: "true"
+      OFFLINE_MODE: "true"
+    depends_on:
+      database:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import ssl,urllib.request; urllib.request.urlopen('https://127.0.0.1:8443/health', context=ssl._create_unverified_context(), timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${UI_PORT:-8443}:8443"
+    volumes:
+      - ./certs:/certs:ro
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m,mode=1770
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks:
+      - scheduler_private
+      - scheduler_edge
+
+volumes:
+  scheduler_database:
+
+networks:
+  scheduler_private:
+    internal: true
+  scheduler_edge:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.enable_ip_masquerade: "false"

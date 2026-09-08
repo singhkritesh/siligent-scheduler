@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <meta name="theme-color" content="#123f3b">
+    <title>Siligent Dental Operations</title>
+    <link rel="stylesheet" href="/static/app.css">
+  </head>
+  <body>
+    <div id="login-view" class="login-shell">
+      <section class="login-card" aria-labelledby="login-title">
+        <div class="brand-symbol" aria-hidden="true">S</div>
+        <p class="eyebrow">Private practice system</p>
+        <h1 id="login-title">Siligent</h1>
+        <p class="lede">Plan the day, schedule patients, and protect every confirmed visit from one local workspace.</p>
+        <form id="login-form" class="form-stack">
+          <label>Username<input id="login-username" autocomplete="username" required></label>
+          <label>Password<input id="login-password" type="password" autocomplete="current-password" required></label>
+          <p id="login-error" class="form-error" role="alert"></p>
+          <button class="button primary wide" type="submit">Sign in securely</button>
+        </form>
+        <div class="privacy-chip"><i></i> On premises · Offline mode</div>
+      </section>
+      <aside class="login-aside" aria-hidden="true">
+        <div class="clinical-orbit"><span></span><span></span><span></span></div>
+        <blockquote>A clear next action for every patient and every member of the team.</blockquote>
+      </aside>
+    </div>
+
+    <div id="app-view" class="app-shell" hidden>
+      <aside class="sidebar">
+        <div class="sidebar-brand">
+          <span class="brand-symbol small">S</span>
+          <span><strong>Siligent</strong><small>Dental operations</small></span>
+        </div>
+        <nav aria-label="Primary navigation">
+          <span class="nav-group-label">Workspace</span>
+          <button class="nav-item active" data-route="home" data-roles="administrator,scheduler,clinician,auditor"><span aria-hidden="true">⌂</span>Home</button>
+          <span class="nav-group-label" data-roles="administrator,scheduler,clinician">Daily work</span>
+          <button class="nav-item" data-route="operations" data-roles="administrator,scheduler,clinician"><span aria-hidden="true">01</span>Today</button>
+          <button class="nav-item" data-route="scheduler" data-roles="administrator,scheduler,clinician"><span aria-hidden="true">02</span>Schedule patient</button>
+          <button class="nav-item" data-route="waitlist" data-roles="administrator,scheduler,clinician"><span aria-hidden="true">03</span>ASAP waitlist</button>
+          <button class="nav-item" data-route="calendar" data-roles="administrator,scheduler,clinician"><span aria-hidden="true">04</span>Calendar</button>
+          <span class="nav-group-label" data-roles="administrator,scheduler,clinician">Insights</span>
+          <button class="nav-item" data-route="analytics" data-roles="administrator,scheduler,clinician"><span aria-hidden="true">05</span>Reports</button>
+          <button class="nav-item" data-route="simulation" data-roles="administrator,scheduler,clinician"><span aria-hidden="true">06</span>Simulation</button>
+          <span class="nav-group-label" data-roles="administrator,auditor">Administration</span>
+          <button class="nav-item" data-route="configuration/people" data-roles="administrator"><span aria-hidden="true">07</span>Settings</button>
+          <button class="nav-item" data-route="audit" data-roles="administrator,auditor"><span aria-hidden="true">08</span>Audit log</button>
+        </nav>
+        <div class="sidebar-foot">
+          <div class="network-state"><i></i><span><strong>Private network</strong><small>No cloud services</small></span></div>
+          <button id="logout-button" class="link-button">Sign out</button>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <div class="page-identity">
+            <p id="today-label" class="eyebrow"></p>
+            <h1 id="view-title">Home</h1>
+            <p id="view-subtitle" class="view-subtitle">Your next actions and practice status.</p>
+          </div>
+          <div class="topbar-actions">
+            <button id="page-help-button" class="button quiet" type="button"><span aria-hidden="true">ⓘ</span> About this page</button>
+            <div class="user-chip"><span id="user-initials" class="avatar"></span><span><strong id="user-name"></strong><small id="user-role"></small></span></div>
+          </div>
+        </header>
+
+        <section id="activity-banner" class="activity-banner" aria-live="polite" hidden>
+          <div><strong id="activity-title"></strong><span id="activity-detail"></span></div>
+          <button id="dismiss-activity" class="icon-button" type="button" aria-label="Dismiss message">×</button>
+        </section>
+
+        <section id="home-view" class="view">
+          <div class="hero-card">
+            <div>
+              <p class="eyebrow">Your workspace</p>
+              <h2 id="home-greeting">Good day</h2>
+              <p id="home-guidance">Start with the work that needs attention now.</p>
+            </div>
+            <div id="home-quick-actions" class="quick-actions"></div>
+          </div>
+          <div id="home-metrics" class="metric-grid"></div>
+          <div class="home-grid">
+            <section class="panel">
+              <div class="panel-head"><div><p class="eyebrow">Attention queue</p><h2>Upcoming visits</h2></div><button class="link-button" type="button" data-route-target="operations">Open Today</button></div>
+              <div id="home-upcoming" class="appointment-list"></div>
+            </section>
+            <section class="panel role-panel">
+              <div class="panel-head"><div><p class="eyebrow">For your role</p><h2 id="role-panel-title">Recommended actions</h2></div></div>
+              <div id="role-action-list" class="task-list"></div>
+            </section>
+          </div>
+        </section>
+
+        <section id="operations-view" class="view" hidden>
+          <div class="page-actions">
+            <div><h2>Run the day</h2><p>Record real arrival, seating, and visit outcomes in order.</p></div>
+            <div><button id="quick-walkin" class="button secondary" type="button">Schedule walk-in</button><label class="inline-date">Operating day<input id="operations-date" type="date"></label></div>
+          </div>
+          <div id="operations-summary" class="metric-grid compact-metrics"></div>
+          <div class="operations-layout">
+            <section class="panel"><div class="panel-head"><div><p class="eyebrow">Patient flow</p><h2>Visit timeline</h2></div></div><div id="operations-appointments" class="timeline-list"></div></section>
+            <section class="panel"><div class="panel-head"><div><p class="eyebrow">Staffing context</p><h2>Team capacity</h2></div></div><div id="provider-board" class="provider-board"></div></section>
+          </div>
+        </section>
+
+        <section id="scheduler-view" class="view" hidden>
+          <div class="workflow-shell">
+            <nav class="workflow-progress" aria-label="Scheduling progress">
+              <button class="workflow-step active" type="button" data-step-target="1"><span>1</span><strong>Patient</strong></button>
+              <button class="workflow-step" type="button" data-step-target="2"><span>2</span><strong>Treatment</strong></button>
+              <button class="workflow-step" type="button" data-step-target="3"><span>3</span><strong>Availability</strong></button>
+              <button class="workflow-step" type="button" data-step-target="4"><span>4</span><strong>Choose opening</strong></button>
+            </nav>
+            <form id="schedule-form" class="workflow-card">
+              <section data-schedule-step="1">
+                <div class="step-header"><div><p class="eyebrow">Step 1 of 4</p><h2>Find or add the patient</h2><p>Search existing records first to avoid duplicate patient identities.</p></div></div>
+                <div class="patient-search-box">
+                  <label>Find existing patient<div class="search-control"><input id="patient-search" autocomplete="off" placeholder="Enter name or patient record number"><button id="patient-search-button" class="button secondary" type="button">Search</button></div></label>
+                  <div id="patient-search-results" class="search-results" aria-live="polite"></div>
+                </div>
+                <div class="section-divider"><span>Patient details</span></div>
+                <div class="form-grid two"><label>Patient name<input id="patient-name" required minlength="2" maxlength="160" autocomplete="off"></label><label>Patient record number (MRN)<input id="patient-mrn" required minlength="2" maxlength="80" autocomplete="off"></label></div>
+                <p class="field-guidance">Selecting an existing patient fills these fields. For a new patient, enter the practice-approved identity values.</p>
+                <div class="workflow-actions end"><button class="button primary" type="button" data-next-step="2">Continue to treatment</button></div>
+              </section>
+
+              <section data-schedule-step="2" hidden>
+                <div class="step-header"><div><p class="eyebrow">Step 2 of 4</p><h2>Select treatment</h2><p>Use only the clinician-approved procedure and complexity.</p></div></div>
+                <label>Procedure<select id="procedure" required></select></label>
+                <div id="procedure-preview" class="phase-preview"></div>
+                <label>Case complexity<select id="difficulty"><option value="standard">Standard</option><option value="complex">Complex</option></select><small>Choose Complex only when supported by the practice's clinical policy.</small></label>
+                <label>Scheduling context <span class="optional-label">Optional</span><textarea id="condition" rows="3" maxlength="4000" placeholder="Only the information needed to schedule safely"></textarea><small>Do not paste a chart note or unrelated clinical narrative.</small></label>
+                <div class="workflow-actions"><button class="button quiet" type="button" data-previous-step="1">Back</button><button class="button primary" type="button" data-next-step="3">Continue to availability</button></div>
+              </section>
+
+              <section data-schedule-step="3" hidden>
+                <div class="step-header"><div><p class="eyebrow">Step 3 of 4</p><h2>Set acceptable availability</h2><p>The optimizer will preserve every hard resource and patient constraint.</p></div></div>
+                <div class="form-grid two"><label>Earliest acceptable date<input id="date-from" type="date" required></label><label>Latest acceptable date<input id="date-to" type="date" required></label></div>
+                <div class="form-grid two"><label>Earliest daily time<input id="time-from" type="time" value="08:00" required></label><label>Latest daily time<input id="time-to" type="time" value="17:00" required></label></div>
+                <details class="advanced-options"><summary>Additional preferences</summary><div class="advanced-options-body"><label>Preferred dentist <span class="optional-label">Optional</span><select id="preferred-doctor"></select></label><label class="check-field"><input id="waitlist-consent" type="checkbox"><span>Add to the ASAP waitlist if no feasible opening exists</span></label><label class="check-field"><input id="walk-in" type="checkbox"><span>Patient is already onsite as a walk-in</span></label><label class="check-field warning-check" data-roles="administrator,clinician"><input id="reserved-block-override-search" type="checkbox"><span>Include reserved blocks as override options<small>Every conflicting option will require an authorized reason and explicit confirmation.</small></span></label></div></details>
+                <div class="workflow-actions"><button class="button quiet" type="button" data-previous-step="2">Back</button><button id="recommend-button" class="button primary" type="submit">Find feasible openings</button></div>
+              </section>
+
+              <section data-schedule-step="4" hidden>
+                <div class="step-header result-header"><div><p class="eyebrow">Step 4 of 4</p><h2>Choose an opening</h2><p>Compare the complete resource plan before confirming.</p></div><button id="new-schedule-request" class="button quiet" type="button">Start new request</button></div>
+                <div id="intake-summary" class="intake-summary" hidden></div>
+                <div id="recommendations" class="empty-state"><div class="empty-mark">⌕</div><h3>Search has not run</h3><p>Go back to availability and find feasible openings.</p></div>
+                <div class="workflow-actions start"><button class="button quiet" type="button" data-previous-step="3">Change availability</button></div>
+              </section>
+            </form>
+          </div>
+        </section>
+
+        <section id="waitlist-view" class="view" hidden>
+          <div class="page-actions">
+            <div><h2>Work the ASAP queue</h2><p>Find compatible openings and keep contact history current.</p></div>
+            <button id="open-waitlist-dialog" class="button primary" type="button">Add waitlist request</button>
+          </div>
+          <section class="panel">
+            <div class="filter-bar">
+              <label>Search queue<input id="waitlist-filter" placeholder="Patient, MRN, or procedure"></label>
+              <label>Priority<select id="waitlist-priority-filter"><option value="">All priorities</option><option value="urgent">Urgent</option><option value="priority">Priority</option><option value="routine">Routine</option></select></label>
+            </div>
+            <div id="waitlist-entries" class="waitlist-list"></div>
+          </section>
+        </section>
+
+        <section id="calendar-view" class="view" hidden>
+          <div class="page-actions">
+            <div><h2>Review future appointments</h2><p>Appointment density is informational; availability is confirmed only through a scheduling search.</p></div>
+            <div class="segmented-control" aria-label="Calendar view"><button class="active" type="button" data-calendar-mode="month">Month</button><button type="button" data-calendar-mode="year">Annual capacity</button></div>
+          </div>
+          <div id="month-controls" class="month-controls"><button id="previous-month" class="icon-button" type="button" aria-label="Previous month">‹</button><strong id="calendar-month-label"></strong><button id="next-month" class="icon-button" type="button" aria-label="Next month">›</button></div>
+          <div id="calendar-grid" class="calendar-grid"></div>
+          <section id="day-detail" class="panel day-detail" hidden><div class="panel-head"><div><p id="day-detail-label" class="eyebrow"></p><h2>Day details</h2></div><button id="close-day-detail" class="link-button" type="button">Close day</button></div><div id="day-reserved-blocks" class="day-block-list"></div><div id="day-appointments" class="appointment-list"></div></section>
+        </section>
+
+        <section id="analytics-view" class="view" hidden>
+          <div class="page-actions">
+            <div><h2>Review operational patterns</h2><p>Descriptive local metrics support operational review; they do not make clinical decisions.</p></div>
+            <div class="date-filter"><label>From<input id="analytics-from" type="date"></label><label>Through<input id="analytics-to" type="date"></label></div>
+          </div>
+          <div id="analytics-summary" class="metric-grid"></div>
+          <div class="two-panel"><section class="panel"><div class="panel-head"><div><p class="eyebrow">Provider operations</p><h2>Booked time and production</h2></div></div><div id="analytics-providers" class="resource-list"></div></section><section class="panel"><div class="panel-head"><div><p class="eyebrow">Attendance and duration</p><h2>Procedure trends</h2></div></div><div id="analytics-procedures" class="resource-list"></div></section></div>
+        </section>
+
+        <section id="simulation-view" class="view" hidden>
+          <div class="page-actions">
+            <div><h2>Test appointment demand safely</h2><p>Replay de-identified requests against current capacity without writing to the live calendar.</p></div>
+            <a class="button quiet" href="/static/simulation-template.csv" download>Download blank CSV template</a>
+          </div>
+          <div class="simulation-guard"><strong>Simulation is isolated.</strong><span>It reads current procedure policy, staffing, rooms, equipment, closures, reserved blocks, and locked appointments. It cannot create, cancel, or move a live appointment.</span></div>
+          <div class="simulation-steps">
+            <section class="panel simulation-step-card">
+              <div class="simulation-step-head"><span>1</span><div><p class="eyebrow">Upload</p><h2>Select demand data</h2></div></div>
+              <form id="simulation-upload-form" class="form-stack">
+                <label>De-identified CSV or Excel workbook
+                  <input id="simulation-file" type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required>
+                  <small>Maximum 1,000 rows or 5 MB. The first worksheet is used for Excel files.</small>
+                </label>
+                <p class="field-guidance">Use opaque patient references and controlled condition tags. Patient names, MRNs, birth dates, contact details, free-text conditions, notes, and formulas are rejected.</p>
+                <p class="field-guidance">Availability dates must be inside the current rolling-year horizon. De-identified historical demand must be date-shifted into that horizon before upload.</p>
+                <button id="simulation-preview-button" class="button secondary" type="submit">Validate and preview</button>
+              </form>
+              <details class="schema-disclosure"><summary>Required spreadsheet columns</summary><div><code>request_id</code><code>patient_ref</code><code>procedure_code</code><code>difficulty</code><code>priority</code><code>availability_start_date</code><code>availability_end_date</code><code>daily_start_time</code><code>daily_end_time</code></div></details>
+            </section>
+            <section class="panel simulation-step-card" id="simulation-preview-panel">
+              <div class="simulation-step-head"><span>2</span><div><p class="eyebrow">Review</p><h2>Validate the upload</h2></div></div>
+              <div id="simulation-preview-empty" class="empty-state compact"><p>Select a CSV or XLSX file, then validate it before running.</p></div>
+              <div id="simulation-preview-content" hidden>
+                <div id="simulation-preview-summary" class="simulation-summary-strip"></div>
+                <p id="simulation-policy-note" class="field-guidance"></p>
+                <div class="simulation-table-wrap"><div id="simulation-preview-table" class="simulation-table"></div></div>
+                <div class="workflow-actions"><button id="simulation-clear-button" class="button quiet" type="button">Clear upload</button><button id="simulation-run-button" class="button primary" type="button">Run simulation</button></div>
+              </div>
+            </section>
+          </div>
+          <section id="simulation-results-panel" class="panel simulation-results" hidden>
+            <div class="panel-head"><div><p class="eyebrow">3 · Results</p><h2>Hypothetical schedule</h2><p>Every accepted row is locked inside this run before the next request is evaluated.</p></div><div class="row-actions"><button id="simulation-download-results" class="button secondary" type="button">Download results CSV</button><button id="simulation-download-report" class="button quiet" type="button">Download report JSON</button></div></div>
+            <div id="simulation-result-metrics" class="metric-grid"></div>
+            <div id="simulation-invariant-status" class="simulation-invariant"></div>
+            <div class="simulation-table-wrap results-table-wrap"><div id="simulation-results-table" class="simulation-table"></div></div>
+          </section>
+        </section>
+
+        <section id="configuration-view" class="view" hidden>
+          <div class="settings-layout">
+            <nav class="settings-nav" aria-label="Settings sections">
+              <button class="active" type="button" data-settings-route="people"><strong>Team and access</strong><span>Providers and user accounts</span></button>
+              <button type="button" data-settings-route="availability"><strong>Availability</strong><span>Leave, shifts, and closures</span></button>
+              <button type="button" data-settings-route="resources"><strong>Rooms and equipment</strong><span>Physical scheduling capacity</span></button>
+              <button type="button" data-settings-route="clinical"><strong>Procedure rules</strong><span>Phases, supervision, preferences</span></button>
+              <button type="button" data-settings-route="calibration"><strong>Duration recommendations</strong><span>Optional local timing evidence</span></button>
+            </nav>
+            <div class="settings-content">
+              <section data-settings-section="people">
+                <div class="section-heading"><h2>Team and access</h2><p>Review configured people before opening an add form.</p></div>
+                <section class="panel settings-card"><div class="panel-head"><div><p class="eyebrow">Clinical coverage</p><h2>Support providers</h2></div></div><div id="configuration-providers" class="resource-list"></div><details class="editor-disclosure"><summary>Add support provider</summary><form id="provider-form" class="form-stack editor-body"><div class="form-grid two"><label>Staff code<input id="provider-code" minlength="2" maxlength="40" required></label><label>Display name<input id="provider-name" minlength="2" maxlength="160" required></label></div><label>Role<select id="provider-role"><option value="assistant">Assistant</option><option value="hygienist">Hygienist</option></select></label><button class="button primary" type="submit">Add provider</button></form></details></section>
+                <section class="panel settings-card"><div class="panel-head"><div><p class="eyebrow">Unique access</p><h2>Practice users</h2></div></div><div id="configuration-users" class="resource-list"></div><details class="editor-disclosure"><summary>Create unique account</summary><form id="user-form" class="form-stack editor-body"><div class="form-grid two"><label>Username<input id="new-username" minlength="3" maxlength="100" required></label><label>Display name<input id="new-user-name" minlength="2" maxlength="160" required></label></div><div class="form-grid two"><label>Role<select id="new-user-role"><option value="scheduler">Scheduler</option><option value="clinician">Clinician</option><option value="auditor">Auditor</option><option value="administrator">Administrator</option></select></label><label>Temporary password<input id="new-user-password" type="password" minlength="12" maxlength="256" required></label></div><button class="button primary" type="submit">Create account</button></form></details></section>
+              </section>
+
+              <section data-settings-section="availability" hidden>
+                <div class="section-heading"><h2>Availability and closures</h2><p>Control dated exceptions without changing confirmed appointments.</p></div>
+                <section class="panel settings-card"><div class="panel-head"><div><p class="eyebrow">Protected capacity</p><h2>Reserved procedure blocks</h2></div></div><div id="configuration-reserved-blocks" class="resource-list"></div><details class="editor-disclosure"><summary>Create reserved block</summary><form id="reserved-block-form" class="form-stack editor-body"><div class="form-grid two"><label>Dentist<select id="reserved-block-doctor" required></select></label><label>Procedure<select id="reserved-block-procedure" required></select></label></div><div class="form-grid two"><label>Starts<input id="reserved-block-start" type="datetime-local" required></label><label>Ends<input id="reserved-block-end" type="datetime-local" required></label></div><div class="form-grid two"><label>Reserved room <span class="optional-label">Optional</span><select id="reserved-block-room"><option value="">No room reserved</option></select></label><label>Reserved equipment unit <span class="optional-label">Optional</span><select id="reserved-block-equipment"><option value="">No equipment reserved</option></select></label></div><label>Automatic release <span class="optional-label">Optional</span><input id="reserved-block-release-at" type="datetime-local"><small>If set, normal scheduling resumes at this time unless the block has already been fulfilled.</small></label><label>Operational reason<textarea id="reserved-block-reason" minlength="3" maxlength="500" required></textarea></label><div class="warning"><strong>Existing appointments will not move.</strong><span>The block is rejected if it conflicts with any confirmed or held appointment.</span></div><button class="button primary" type="submit">Create protected block</button></form></details></section>
+                <section class="panel settings-card"><div class="panel-head"><div><p class="eyebrow">Provider availability</p><h2>Leave and time blocks</h2></div></div><div id="configuration-leave" class="resource-list"></div><details class="editor-disclosure"><summary>Block provider time</summary><form id="leave-form" class="form-stack editor-body"><label>Provider<select id="leave-provider"></select></label><div class="form-grid two"><label>Starts<input id="leave-start" type="datetime-local" required></label><label>Ends<input id="leave-end" type="datetime-local" required></label></div><label>Reason<select id="leave-reason"><option value="planned_leave">Planned leave</option><option value="training">Training</option><option value="illness">Illness</option><option value="administrative">Administrative</option></select></label><button class="button primary" type="submit">Block provider time</button></form></details></section>
+                <section class="panel settings-card"><div class="panel-head"><div><p class="eyebrow">Daily rota</p><h2>Shift and coverage overrides</h2></div></div><div id="configuration-shifts" class="resource-list"></div><details class="editor-disclosure"><summary>Add daily override</summary><form id="shift-form" class="form-stack editor-body"><label>Provider<select id="shift-provider"></select></label><div class="form-grid two"><label>Date<input id="shift-date" type="date" required></label><label>Status<select id="shift-status"><option value="scheduled">Scheduled</option><option value="off">Off</option><option value="cover">Covering another provider</option></select></label></div><div class="form-grid two"><label>Starts<input id="shift-start" type="time" value="08:00"></label><label>Ends<input id="shift-end" type="time" value="17:00"></label></div><label>Covering for<select id="shift-cover-for"><option value="">Not coverage</option></select></label><button class="button primary" type="submit">Save override</button></form></details></section>
+                <section class="panel settings-card"><div class="panel-head"><div><p class="eyebrow">Practice calendar</p><h2>Full-practice closures</h2></div></div><div id="configuration-closures" class="resource-list"></div><details class="editor-disclosure"><summary>Add closure</summary><form id="closure-form" class="form-stack editor-body"><div class="form-grid two"><label>Starts<input id="closure-start" type="datetime-local" required></label><label>Ends<input id="closure-end" type="datetime-local" required></label></div><label>Reason<select id="closure-reason"><option value="practice_closed">Practice closed</option><option value="holiday">Holiday</option><option value="maintenance">Facility maintenance</option><option value="emergency">Emergency closure</option></select></label><button class="button primary" type="submit">Block practice</button></form></details></section>
+              </section>
+
+              <section data-settings-section="resources" hidden>
+                <div class="section-heading"><h2>Rooms and equipment</h2><p>Maintain physical capacity used by the deterministic optimizer.</p></div>
+                <section class="panel settings-card"><div class="panel-head"><div><p class="eyebrow">Physical capacity</p><h2>Operatories</h2></div></div><div id="configuration-rooms" class="resource-list"></div><details class="editor-disclosure"><summary>Add operatory</summary><form id="room-form" class="form-stack editor-body"><div class="form-grid two"><label>Room code<input id="room-code" minlength="2" maxlength="40" required></label><label>Room name<input id="room-name" minlength="2" maxlength="160" required></label></div><label>Category<select id="room-category"><option value="general">General</option><option value="hygiene">Hygiene</option><option value="exam">Exam</option><option value="surgical">Surgical</option></select></label><button class="button primary" type="submit">Add operatory</button></form></details></section>
+                <section class="panel settings-card"><div class="panel-head"><div><p class="eyebrow">Scarce resources</p><h2>Equipment</h2></div></div><div id="configuration-equipment" class="resource-list"></div><details class="editor-disclosure"><summary>Add or update equipment</summary><form id="equipment-form" class="form-stack editor-body"><div class="form-grid two"><label>Code<input id="equipment-code" minlength="2" maxlength="40" required></label><label>Name<input id="equipment-name" minlength="2" maxlength="160" required></label></div><label>Available units<input id="equipment-quantity" type="number" min="1" max="100" value="1" required></label><button class="button primary" type="submit">Save equipment</button></form></details><details class="editor-disclosure"><summary>Set procedure requirement</summary><form id="equipment-requirement-form" class="form-stack editor-body"><label>Procedure<select id="requirement-procedure"></select></label><label>Equipment<select id="requirement-equipment"></select></label><label>Units required<input id="requirement-quantity" type="number" min="0" max="20" value="1" required><small>Set to 0 to remove the requirement.</small></label><button class="button primary" type="submit">Save requirement</button></form></details></section>
+              </section>
+
+              <section data-settings-section="clinical" hidden>
+                <div class="section-heading"><h2>Procedure and scheduling rules</h2><p>Clinical approval is required before changing governed policy.</p></div>
+                <section class="panel settings-card"><div class="panel-head"><div><p class="eyebrow">Dentist policy</p><h2>Supervision and preferences</h2></div></div><details class="editor-disclosure"><summary>Edit supervision limit</summary><form id="capacity-form" class="form-stack editor-body"><label>Dentist<select id="capacity-doctor"></select></label><label>Maximum simultaneous active rooms<input id="capacity-value" type="number" min="1" max="8" value="3"></label><button class="button primary" type="submit">Save supervision limit</button></form></details><details class="editor-disclosure"><summary>Edit procedure preference</summary><form id="preference-form" class="form-stack editor-body"><label>Dentist<select id="preference-provider"></select></label><label>Procedure<select id="preference-procedure"></select></label><label>Preference<input id="preference-value" type="number" min="-10" max="10" value="0"><small>-10 means avoid when alternatives exist; +10 means prefer.</small></label><button class="button primary" type="submit">Save preference</button></form></details></section>
+                <section class="panel settings-card"><div class="panel-head"><div><p class="eyebrow">Clinical policy</p><h2>Procedure phases</h2></div></div><details class="editor-disclosure"><summary>Edit clinician-approved procedure</summary><form id="procedure-policy-form" class="form-stack editor-body"><div class="form-grid three"><label>Procedure<select id="policy-procedure"></select></label><label>Name<input id="policy-name" required></label><label>Production value (cents)<input id="policy-production" type="number" min="0" required></label></div><div id="phase-editor" class="phase-editor"></div><div class="row-actions"><button id="add-phase" class="button secondary" type="button">Add phase</button><button class="button primary" type="submit">Save approved policy</button></div></form></details></section>
+              </section>
+
+              <section data-settings-section="calibration" hidden>
+                <div class="section-heading"><h2>Duration recommendations</h2><p>Reference defaults work immediately; local data may only propose future changes.</p></div>
+                <section class="panel settings-card"><div class="panel-head"><div><p class="eyebrow">Optional local refinement</p><h2>Timing evidence</h2></div></div><div id="calibration-results" class="resource-list"></div><details class="editor-disclosure"><summary>Add de-identified history</summary><form id="calibration-form" class="form-stack editor-body"><label>History source label<input id="calibration-source" minlength="2" maxlength="160" required></label><label>De-identified CSV<input id="calibration-file" type="file" accept=".csv,text/csv" required></label><p class="field-guidance">Required columns: procedure_code, service_date, scheduled_minutes, actual_minutes, outcome. Patient identifiers are rejected.</p><button class="button primary" type="submit">Import history</button></form></details></section>
+              </section>
+            </div>
+          </div>
+        </section>
+
+        <section id="audit-view" class="view" hidden>
+          <div class="page-actions"><div><h2>Review controlled activity</h2><p>Audit events are append-only and exclude clinical free text.</p></div></div>
+          <section class="panel">
+            <div class="filter-bar three-filters"><label>Search events<input id="audit-filter" placeholder="Event, actor, or entity type"></label><label>Category<select id="audit-category"><option value="">All categories</option></select></label><label>Outcome<select id="audit-outcome"><option value="">All outcomes</option></select></label></div>
+            <div id="audit-list" class="audit-list"></div>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="help-dialog" class="modal"><div class="modal-card"><header><div><p class="eyebrow">Contextual guidance</p><h2 id="help-title">About this page</h2></div><button class="icon-button" type="button" data-dialog-close="help-dialog" aria-label="Close help">×</button></header><p id="help-purpose" class="modal-lede"></p><div class="guidance-grid"><div><strong>Common tasks</strong><ul id="help-tasks"></ul></div><div><strong>Important safety rule</strong><p id="help-safety"></p></div><div><strong>Who can use it</strong><p id="help-access"></p></div></div><button class="button secondary" type="button" data-dialog-close="help-dialog">Done</button></div></dialog>
+
+    <dialog id="confirm-dialog" class="modal"><form id="confirm-form" class="modal-card"><header><div><p class="eyebrow">Final review</p><h2>Confirm and lock appointment</h2></div><button class="icon-button" type="button" data-dialog-close="confirm-dialog" aria-label="Close confirmation">×</button></header><div id="confirm-summary" class="review-summary"></div><label id="confirm-intake-row" class="check-field" hidden><input id="intake-confirmation" type="checkbox"><span>I reviewed and accept the locally normalized scheduling tags.</span></label><section id="reserved-block-override-review" class="override-review" hidden><div class="warning"><strong>This opening conflicts with protected capacity.</strong><span>The override applies only to this exact doctor, procedure, room, and time. It cannot move another appointment.</span></div><label>Override reason<textarea id="reserved-block-override-reason" minlength="10" maxlength="500"></textarea></label><label class="check-field"><input id="reserved-block-override-acknowledgement" type="checkbox"><span>I am authorized and approve overriding the identified reserved block for this exact appointment.</span></label></section><div class="warning"><strong>This appointment becomes locked.</strong><span>Changing it later requires the protected rescheduling workflow and explicit authorization.</span></div><div class="modal-actions"><button class="button quiet" type="button" data-dialog-close="confirm-dialog">Back</button><button id="confirm-slot-button" class="button primary" type="submit">Confirm and lock</button></div></form></dialog>
+
+    <dialog id="waitlist-add-dialog" class="modal"><form id="waitlist-form" class="modal-card"><header><div><p class="eyebrow">ASAP queue</p><h2>Add waitlist request</h2></div><button class="icon-button" type="button" data-dialog-close="waitlist-add-dialog" aria-label="Close waitlist form">×</button></header><div class="form-grid two"><label>Patient name<input id="waitlist-name" minlength="2" maxlength="160" required></label><label>Patient record number (MRN)<input id="waitlist-mrn" minlength="2" maxlength="80" required></label></div><label>Procedure<select id="waitlist-procedure"></select></label><div class="form-grid two"><label>Earliest acceptable date<input id="waitlist-from" type="date" required></label><label>Latest acceptable date<input id="waitlist-to" type="date" required></label></div><div class="form-grid two"><label>Earliest daily time<input id="waitlist-time-from" type="time" value="08:00"></label><label>Latest daily time<input id="waitlist-time-to" type="time" value="17:00"></label></div><label>Priority<select id="waitlist-priority"><option value="routine">Routine</option><option value="priority">Priority</option><option value="urgent">Urgent</option></select></label><div class="modal-actions"><button class="button quiet" type="button" data-dialog-close="waitlist-add-dialog">Cancel</button><button class="button primary" type="submit">Add to waitlist</button></div></form></dialog>
+
+    <dialog id="waitlist-contact-dialog" class="modal"><form id="waitlist-contact-form" class="modal-card"><header><div><p class="eyebrow">Contact history</p><h2>Record waitlist contact</h2></div><button class="icon-button" type="button" data-dialog-close="waitlist-contact-dialog" aria-label="Close contact form">×</button></header><p id="waitlist-contact-summary" class="modal-lede"></p><label>Channel<select id="contact-channel"><option value="phone">Phone</option><option value="sms">SMS</option><option value="in_person">In person</option></select></label><label>Outcome<select id="contact-outcome"><option value="no_answer">No answer</option><option value="left_message">Left message</option><option value="offered">Opening offered</option><option value="accepted">Accepted</option><option value="declined">Declined</option></select></label><label>Incentive offered <span class="optional-label">Optional</span><input id="contact-incentive" maxlength="200"></label><div class="modal-actions"><button class="button quiet" type="button" data-dialog-close="waitlist-contact-dialog">Cancel</button><button class="button primary" type="submit">Record contact</button></div></form></dialog>
+
+    <dialog id="reschedule-dialog" class="modal"><form id="reschedule-form" class="modal-card"><header><div><p class="eyebrow">Protected change</p><h2>Reschedule locked visit</h2></div><button class="icon-button" type="button" data-dialog-close="reschedule-dialog" aria-label="Close rescheduling">×</button></header><div class="warning"><strong>Explicit authorization is required.</strong><span>The original visit stays unchanged until one exact replacement is approved.</span></div><div class="form-grid two"><label>Earliest acceptable date<input id="reschedule-from" type="date"></label><label>Latest acceptable date<input id="reschedule-to" type="date"></label></div><div class="form-grid two"><label>Earliest daily time<input id="reschedule-time-from" type="time" value="08:00"></label><label>Latest daily time<input id="reschedule-time-to" type="time" value="17:00"></label></div><button id="find-reschedule-button" class="button secondary wide" type="button">Preview replacements</button><div id="reschedule-options" class="option-list"></div><label>Authorization reason<textarea id="reschedule-reason" minlength="10" maxlength="500"></textarea></label><label class="check-field"><input id="reschedule-approval" type="checkbox"><span>I have permission to authorize this exact replacement.</span></label><button id="apply-reschedule-button" class="button danger wide" type="submit" disabled>Authorize and replace</button></form></dialog>
+
+    <dialog id="status-dialog" class="modal"><form id="status-form" class="modal-card"><header><div><p class="eyebrow">Visit outcome</p><h2>Record appointment outcome</h2></div><button class="icon-button" type="button" data-dialog-close="status-dialog" aria-label="Close outcome form">×</button></header><label>Outcome<select id="status-value"><option value="completed">Completed</option><option value="cancelled">Cancelled</option><option value="no_show">No show</option></select></label><label>Reason or disposition<textarea id="status-reason" minlength="3" maxlength="500" required></textarea></label><div class="modal-actions"><button class="button quiet" type="button" data-dialog-close="status-dialog">Cancel</button><button id="apply-status-button" class="button primary" type="submit">Record outcome</button></div></form></dialog>
+
+    <dialog id="vacancy-recovery-dialog" class="modal recovery-modal"><div class="modal-card"><header><div><p class="eyebrow">Focused vacancy recovery</p><h2>Fill one opening safely</h2></div><button id="close-vacancy-recovery" class="icon-button" type="button" aria-label="Finish and close vacancy recovery">×</button></header><section id="vacancy-recovery-start"><p id="vacancy-recovery-start-summary" class="modal-lede"></p><div class="warning"><strong>No automatic reshuffling.</strong><span>This checks whether a later, unfulfilled appointment can use this exact opening. Nothing moves until that patient gives permission and you approve the exact change.</span></div><div class="modal-actions"><button class="button quiet" type="button" data-dialog-close="vacancy-recovery-dialog">Leave opening unfilled</button><button id="start-vacancy-recovery" class="button primary" type="button">Review later visits</button></div></section><section id="vacancy-recovery-workspace" class="recovery-workspace" hidden><div class="recovery-current"><span id="vacancy-current-slot"></span><span id="vacancy-step-count" class="badge"></span></div><div class="warning"><strong>One permission, one move.</strong><span>Every preview is limited to this exact doctor, room, and start time. Applying it releases only that appointment’s former slot; the rest of the calendar stays locked.</span></div><div class="modal-actions"><button id="vacancy-stop-button" class="button quiet" type="button">Finish recovery</button><button id="find-vacancy-candidates" class="button secondary" type="button">Find eligible later visits</button></div><div id="vacancy-candidates" class="option-list" aria-live="polite"></div><form id="vacancy-approval" class="approval-panel" hidden><div id="vacancy-approval-summary" class="review-summary"></div><label>How permission was obtained<select id="vacancy-permission-method"><option value="phone">Phone</option><option value="sms">SMS</option><option value="portal">Patient portal</option><option value="in_person">In person</option></select></label><label>Authorization note<textarea id="vacancy-move-reason" minlength="10" maxlength="500" placeholder="Record who confirmed the exact earlier date and time" required></textarea></label><label class="check-field warning-check"><input id="vacancy-permission-confirmed" type="checkbox"><span>The named patient authorized this exact earlier date and time.</span></label><label class="check-field"><input id="vacancy-exact-acknowledged" type="checkbox"><span>I understand only this appointment will move and every other appointment remains locked.</span></label><button id="apply-vacancy-move" class="button danger wide" type="submit" disabled>Apply this one approved move</button></form><section class="recovery-history"><h3>Approved moves</h3><div id="vacancy-recovery-history"></div></section></section></div></dialog>
+
+    <dialog id="calibration-approval-dialog" class="modal"><form id="calibration-approval-form" class="modal-card"><header><div><p class="eyebrow">Clinical approval</p><h2>Apply duration recommendation</h2></div><button class="icon-button" type="button" data-dialog-close="calibration-approval-dialog" aria-label="Close approval form">×</button></header><p id="calibration-approval-summary" class="modal-lede"></p><label>Approval reason<textarea id="calibration-approval-reason" minlength="10" maxlength="500" required></textarea></label><div class="warning"><strong>Prospective change only.</strong><span>Existing confirmed appointments will not be changed.</span></div><div class="modal-actions"><button class="button quiet" type="button" data-dialog-close="calibration-approval-dialog">Cancel</button><button class="button primary" type="submit">Approve and apply</button></div></form></dialog>
+
+    <dialog id="reserved-block-release-dialog" class="modal"><form id="reserved-block-release-form" class="modal-card"><header><div><p class="eyebrow">Protected capacity</p><h2>Release reserved block</h2></div><button class="icon-button" type="button" data-dialog-close="reserved-block-release-dialog" aria-label="Close release form">×</button></header><p id="reserved-block-release-summary" class="modal-lede"></p><label>Release reason<textarea id="reserved-block-release-reason" minlength="10" maxlength="500" required></textarea></label><div class="warning"><strong>This does not change an appointment.</strong><span>Future searches may use the released capacity; the original block and release remain in audit history.</span></div><div class="modal-actions"><button class="button quiet" type="button" data-dialog-close="reserved-block-release-dialog">Cancel</button><button class="button danger" type="submit">Release block</button></div></form></dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>

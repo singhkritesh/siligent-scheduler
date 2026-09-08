@@ -1,0 +1,35 @@
+.DS_Store
+.env
+*.log
+*.pid
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+
+# JavaScript
+node_modules/
+.next/
+dist/
+coverage/
+
+# IDEs
+.idea/
+.vscode/
+
+# Runtime data and secrets
+data/
+backups/
+certs/*.key
+certs/*.crt
+certs/*.pem
+offline-bundles/
+.runtime/
+tmp/
+SHA256SUMS
+SHA256SUMS.sig
+RELEASE-PUBLIC-KEY.pem
