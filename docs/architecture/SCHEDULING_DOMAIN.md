@@ -22,6 +22,31 @@ no-show cannot be recorded before the scheduled start or after arrival. A
 future confirmed visit may still be cancelled through the governed outcome
 workflow.
 
+## Staff lifecycle and deletion
+
+Only administrators can manage staff lifecycle. An active dentist, hygienist,
+or assistant may participate in future recommendations when all other hard
+constraints are met. Deactivation removes that person from future searches but
+does not cancel, move, reslot, or otherwise alter any appointment.
+
+Before deactivating a dentist who has future locked appointments, the
+administrator must explicitly acknowledge that every affected appointment stays
+locked and must be handled through its own authorized workflow. Active protected
+procedure blocks must be explicitly released or the deactivation is rejected.
+Deactivation disables any linked dentist account and revokes its active sessions.
+Reactivation returns the dentist to future searches but does not restore released
+blocks or re-enable an account. A support-provider deactivation similarly
+requires acknowledgement when future appointment phases are retained.
+
+Permanent deletion is a narrow configuration-cleanup action, not a record
+retention mechanism. The staff record must already be inactive and have no
+linked account, appointment or phase record, protected block, recommendation,
+waitlist item, duration observation, production credit, rescheduling artifact,
+or other protected dependency. If eligible, the transaction removes only the
+staff record and related setup configuration, including hours, leave, shifts,
+qualifications, preferences, and targets. It never deletes appointment history
+or audit evidence; it creates a new append-only deletion audit event.
+
 ## Locked appointment rule
 
 A confirmed appointment has a lock version and remains a hard constraint for

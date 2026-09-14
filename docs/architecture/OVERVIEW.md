@@ -57,6 +57,10 @@ The model never writes appointments and cannot weaken a hard constraint.
   evidence.
 - Use synthetic data in fixtures, demonstrations, screenshots, and automated
   tests.
+- A staff record with operational or historical dependencies is retained and
+  made inactive rather than deleted. Permanent deletion is limited to inactive,
+  unused records and their eligible setup configuration; append-only audit
+  evidence is never removed.
 
 ## Data-use pipeline
 
@@ -150,6 +154,19 @@ interval; exclusion constraints prevent double use.
   observations, and optional imports may add prior history. After the configured
   evidence threshold is met, the system stages a calibration recommendation;
   only an administrator or clinician can approve it for future scheduling.
+- Administrators can deactivate or reactivate dentists, assistants, and
+  hygienists through the People workspace. Inactivation removes the person from
+  new scheduling searches but never moves an appointment. A dentist with future
+  locked visits requires an explicit acknowledgement; any active protected
+  procedure blocks require an explicit release choice. Linked dentist accounts
+  are disabled and sessions revoked. Reactivation does not recreate released
+  blocks or re-enable accounts.
+- A permanent deletion flow first displays dependencies. It rejects any staff
+  record with linked accounts, appointment or phase history, reserved blocks,
+  scheduling recommendations, waitlist records, duration observations,
+  production credit, or comparable protected history. For an eligible inactive
+  record, it removes only related setup such as hours, leave, shifts,
+  qualifications, preferences, and targets, and records a new audit event.
 
 ## Failure behavior
 

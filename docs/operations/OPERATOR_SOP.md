@@ -103,6 +103,11 @@ recoverability, host storage encryption, or complete HIPAA compliance.
   from new searches, preserves all history, disables linked accounts and revokes
   their active sessions. Reactivation does not restore released blocks or
   reactivate an account automatically.
+- To deactivate an assistant or hygienist, select **Deactivate** on that support
+  provider's record. If future appointment phases exist, acknowledge that those
+  appointments remain locked and unchanged. Reactivation only restores future
+  search eligibility. To disable a user account, use its separate **Deactivate**
+  action; account deactivation revokes sessions but keeps audit history.
 - Never delete a staff record, appointment, or audit evidence to work around a
   staffing change. Use the audited deactivate/reactivate action when history
   exists.

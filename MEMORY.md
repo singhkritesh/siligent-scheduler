@@ -166,6 +166,11 @@ backup restoration, and browser acceptance pass on the target machine.
   and explicit approval.
 - Annual calendar, production and operational analytics, configuration, and
   append-only audit history.
+- Administrator-managed dentist, hygienist, and assistant lifecycle: creation,
+  unique dentist-account linkage, active/inactive status, future-appointment
+  acknowledgement, protected-block release, and permanent deletion only for
+  unused inactive staff records. Existing appointments and audit evidence remain
+  protected.
 - De-identified CSV/XLSX scheduling simulation with schema validation, preview,
   deterministic chronological replay against a read-only live snapshot,
   downloadable row/report results, invariant checks, and no live calendar writes.
@@ -195,7 +200,7 @@ measurement conditions, and review cadence.
 
 ## Validation Status
 
-The current audit passed 59 backend/lifecycle tests, 15 optimizer tests, Python,
+The current audit passed 65 backend/lifecycle tests, 15 optimizer tests, Python,
 JavaScript, and shell validation, the transactional database invariant suite,
 the live TLS API workflow, a 100-request simulation, the focused vacancy flow,
 and a rendered headless-browser login/navigation check. The browser run found no

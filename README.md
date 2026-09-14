@@ -19,7 +19,10 @@ blocks with exact authorized overrides, equipment-unit reservations, patient
 check-in/seating and walk-in flow, de-identified duration calibration with
 clinician approval, a de-identified CSV/XLSX batch scheduling simulation,
 operational analytics, resource administration, and
-append-only audit history.
+append-only audit history. Administrators can add dentists and support providers,
+link a dentist to a unique clinician account, deactivate or reactivate staff
+without moving booked care, and permanently delete only unused inactive staff
+records after a dependency review.
 
 The reference configuration represents three general dentists, five hygienists,
 four assistants, and eight shared operatories. Procedure phases, complex-case
@@ -112,6 +115,10 @@ or production deployment should be measured.
   history exists; calibration data may refine future policy but is never required
   to search or book.
 - No PHI or application telemetry is sent outside the practice environment.
+- A staff departure never reslots a confirmed appointment. Inactive staff are
+  excluded from future searches; permanent deletion is allowed only when no
+  protected historical or clinical dependencies exist, and the audit evidence is
+  retained.
 
 ## How the application uses data
 
@@ -221,8 +228,11 @@ review identifies the dentist, timeslot, supporting
 resources, and lock consequence before confirmation. Every page has optional
 **About this page** guidance describing its purpose, common tasks, access, and
 safety rule. Administrators can create unique accounts,
-add operatories, support providers, equipment and full-practice closures, manage
-the daily rota, and record dated staff unavailability. Clinician-controlled
+add, deactivate, reactivate, and—only for unused inactive records—permanently
+delete dentists, assistants, and hygienists. They can link a dentist to a
+unique clinician account, add operatories, support providers, equipment and
+full-practice closures, manage the daily rota, and record dated staff
+unavailability. Clinician-controlled
 configuration includes exact or weekly doctor procedure blocks, procedure phases
 and standard/complex duration, production
 value, dentist preference, supervision limits, and approval of de-identified
