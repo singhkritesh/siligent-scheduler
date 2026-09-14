@@ -89,6 +89,7 @@ class OperationalLifecycleTests(unittest.TestCase):
             "--offline",
             "--check",
             "--yes",
+            "--fresh",
             "--without-llm",
             "--with-local-model",
             "--no-start",
@@ -105,6 +106,7 @@ class OperationalLifecycleTests(unittest.TestCase):
         self.assertIn("verify.sh", installer)
         self.assertIn("${#prerequisite_args[@]} > 0", installer)
         self.assertIn("${#setup_args[@]} > 0", installer)
+        self.assertIn('"$ROOT_DIR/purge.sh" --yes --remove-local-configuration --remove-backups', installer)
         self.assertIn("brew install", prerequisites)
         self.assertIn("apt-get install", prerequisites)
         self.assertIn("preflight.ps1", prerequisites)
@@ -112,6 +114,17 @@ class OperationalLifecycleTests(unittest.TestCase):
         self.assertIn("requirements.runtime.lock", connected_dockerfile)
         self.assertIn("fastapi==", requirements)
         self.assertIn("psycopg-binary==", requirements)
+
+    def test_fresh_install_requires_explicit_approval_before_any_action(self) -> None:
+        result = subprocess.run(
+            [str(ROOT / "install.sh"), "--fresh", "--without-llm"],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Re-run with --yes", result.stderr)
 
     def test_offline_bundle_is_verified_and_release_evidence_is_generated(self) -> None:
         installer = self.read("install.sh")

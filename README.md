@@ -76,6 +76,16 @@ The local model is never installed or pulled unless explicitly selected.
 Installation creates a **Siligent Scheduler** desktop launcher;
 use `--no-launcher` only on a managed server without a desktop session.
 
+To deliberately replace an existing local scheduler installation with a new,
+empty one, use the explicit fresh-install mode. It removes this scheduler's
+database volume, local configuration, certificates, backups, launcher, and
+product API images before running the normal install/setup workflow. It never
+runs implicitly during an update:
+
+```bash
+./install.sh --fresh --yes --connected --without-llm
+```
+
 Prepare or validate without starting:
 
 ```bash

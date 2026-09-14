@@ -15,6 +15,7 @@ NO_START=false
 NO_LAUNCHER=false
 ALLOW_UNSIGNED=false
 FINALIZE_RUNTIME=false
+FRESH_INSTALL=false
 PYTHON_BASE_IMAGE="${PYTHON_BASE_IMAGE:-python:3.11.15-slim-trixie@sha256:90744cff8f32887f075c47d747a173ff333e9e98801667af93c357fa9f5e28ff}"
 
 usage() {
@@ -27,6 +28,7 @@ usage() {
     '  --offline            Require images and manifests from this extracted bundle.' \
     '  --check              Read-only compatibility audit; install nothing.' \
     '  --yes                Approve prerequisite installation non-interactively.' \
+    '  --fresh              Erase an existing local scheduler installation before installing.' \
     '  --without-llm        Install the default deterministic-rules profile.' \
     '  --with-local-model   Install and validate approved host-local Ollama assistance.' \
     '  --no-start           Install without starting services.' \
@@ -42,6 +44,7 @@ while [[ $# -gt 0 ]]; do
     --offline) [[ "$MODE" != "connected" ]] || siligent_fail 'Choose connected or offline, not both.'; MODE="offline" ;;
     --check) CHECK_ONLY=true ;;
     --yes) ASSUME_YES=true ;;
+    --fresh) FRESH_INSTALL=true ;;
     --without-llm) [[ "$PROFILE_EXPLICIT" == "false" ]] || siligent_fail 'Choose one intake profile.'; PROFILE="without-llm"; PROFILE_EXPLICIT=true ;;
     --with-local-model) [[ "$PROFILE_EXPLICIT" == "false" ]] || siligent_fail 'Choose one intake profile.'; PROFILE="with-local-model"; PROFILE_EXPLICIT=true ;;
     --no-start) NO_START=true ;;
@@ -53,6 +56,11 @@ while [[ $# -gt 0 ]]; do
   esac
   shift
 done
+
+[[ "$FRESH_INSTALL" == "false" || "$CHECK_ONLY" == "false" ]] \
+  || siligent_fail '--fresh cannot be combined with --check because a check must not remove data.'
+[[ "$FRESH_INSTALL" == "false" || "$ASSUME_YES" == "true" ]] \
+  || siligent_fail '--fresh permanently removes the existing scheduler database and local configuration. Re-run with --yes after approved retention and disposal.'
 
 if [[ "$MODE" == "auto" ]]; then
   if [[ -d "$ROOT_DIR/images" && -f "$ROOT_DIR/SHA256SUMS" ]]; then MODE="offline"; else MODE="connected"; fi
@@ -108,6 +116,11 @@ else
     done
   fi
 
+fi
+
+if [[ "$FRESH_INSTALL" == "true" ]]; then
+  siligent_warn 'Fresh install selected: removing the existing scheduler stack, database volume, local configuration, certificates, and backups.'
+  "$ROOT_DIR/purge.sh" --yes --remove-local-configuration --remove-backups
 fi
 
 # An existing installation is backed up before image tags or schema state can

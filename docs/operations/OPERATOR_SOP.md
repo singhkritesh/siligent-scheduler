@@ -245,6 +245,18 @@ certificates, or backups by default. Add `--remove-local-configuration` to
 remove `.env` and local certificate/key files, and add `--remove-backups` only
 when approved backup disposal is also authorized. The operation is irreversible.
 
+For a replacement installation on another practice-controlled device, use the
+supported one-command workflow only after the same disposal approval:
+
+```bash
+./install.sh --fresh --yes --connected --without-llm
+```
+
+It invokes the guarded purge with local-configuration and backup removal, then
+runs the standard prerequisite, configuration, build, startup, health, and
+desktop-launcher workflow. It creates a new empty scheduler database and a new
+administrator credential. Do not use it for a normal upgrade.
+
 ## After Restart, Update, or Restore
 
 1. Run the health check.

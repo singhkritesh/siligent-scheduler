@@ -55,6 +55,12 @@ disposal, use the guarded `./purge.sh --yes` command instead. It scopes removal
 to this scheduler stack and requires additional explicit flags before deleting
 local configuration, TLS material, or backups.
 
+For a deliberate replacement rather than an upgrade, use
+`./install.sh --fresh --yes --offline --without-llm` from a verified offline
+bundle. The command removes the previous local scheduler state, then follows the
+same signed-bundle verification and setup path. It requires documented retention
+and disposal approval and is never the default installation behavior.
+
 Build a platform-specific release on a controlled build workstation:
 
 ```bash

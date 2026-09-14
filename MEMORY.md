@@ -89,6 +89,13 @@ and secure-disposal process:
 ./purge.sh --yes
 ```
 
+Fresh connected installation that deliberately replaces an existing local
+scheduler installation with a new empty one:
+
+```bash
+./install.sh --fresh --yes --connected --without-llm
+```
+
 Controlled local rebuild from preloaded artifacts:
 
 ```bash
@@ -123,6 +130,11 @@ Controlled local rebuild from preloaded artifacts:
   product-owned API image tags, desktop launcher, and runtime state. It preserves
   source files, shared images, configuration, certificates, and backups unless
   the matching explicit removal flags are supplied.
+- `install.sh --fresh --yes` is the only installation mode that invokes the
+  guarded purge automatically. It removes the prior scheduler database, local
+  configuration, certificates, backups, launcher, and product API images before
+  continuing through the normal supported install/setup workflow. Default
+  installation remains an idempotent, data-preserving upgrade.
 - Existing installations receive a pre-upgrade PostgreSQL backup, and the prior
   API image is retained under a timestamped rollback tag before change.
 - `verify.sh` checks health, local images, PostgreSQL exposure, recorded image
