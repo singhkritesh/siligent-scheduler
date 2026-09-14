@@ -249,7 +249,12 @@ Create a database backup before operational changes with `./backup.sh`. A
 guarded `./restore.sh BACKUP.dump` creates another safety backup before replacing
 the current database. `./uninstall.sh` stops services and removes the recognized
 launcher but deliberately preserves data, configuration, certificates, images,
-and backups.
+and backups. For an approved irreversible local disposal, use
+`./purge.sh --yes`; it removes this scheduler's containers, networks, named
+database volume, product-owned API images, desktop launcher, and runtime state.
+It preserves the repository, shared images, configuration, certificates, and
+backups unless `--remove-local-configuration` and/or `--remove-backups` are
+also supplied.
 
 ## Important compliance note
 

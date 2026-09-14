@@ -23,6 +23,7 @@ compatibility assumptions, safety boundaries, and known release gates.
 - Operational and egress verification: `./verify.sh`
 - Database backup and guarded restore: `./backup.sh`, `./restore.sh`
 - Safe shutdown preserving database volumes: `./stop.sh`
+- Controlled irreversible local disposal: `./purge.sh --yes`
 
 ## Product invariants
 

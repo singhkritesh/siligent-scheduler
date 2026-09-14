@@ -82,6 +82,13 @@ Daily start, health check, and safe stop:
 ./stop.sh
 ```
 
+Controlled irreversible local disposal after the practice's approved retention
+and secure-disposal process:
+
+```bash
+./purge.sh --yes
+```
+
 Controlled local rebuild from preloaded artifacts:
 
 ```bash
@@ -111,6 +118,11 @@ Controlled local rebuild from preloaded artifacts:
 - A model-enabled API can reach only the host-local model bridge; the rules
   profile does not call it. Production also requires host-firewall outbound denial.
 - `stop.sh` removes containers and networks but preserves the database volume.
+- `purge.sh --yes` is intentionally separate from normal shutdown and uninstall.
+  It removes this scheduler's containers, networks, named database volume,
+  product-owned API image tags, desktop launcher, and runtime state. It preserves
+  source files, shared images, configuration, certificates, and backups unless
+  the matching explicit removal flags are supplied.
 - Existing installations receive a pre-upgrade PostgreSQL backup, and the prior
   API image is retained under a timestamped rollback tag before change.
 - `verify.sh` checks health, local images, PostgreSQL exposure, recorded image

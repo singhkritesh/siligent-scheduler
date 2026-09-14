@@ -92,7 +92,7 @@ bundle_dir="$stage/$bundle_name"
 trap 'rm -rf "$stage"' EXIT
 mkdir -p "$bundle_dir/images" "$bundle_dir/DEPENDENCIES"
 
-for file in VERSION install.sh setup.sh build.sh start.sh stop.sh verify.sh backup.sh restore.sh uninstall.sh \
+for file in VERSION install.sh setup.sh build.sh start.sh stop.sh verify.sh backup.sh restore.sh uninstall.sh purge.sh \
   docker-compose.yml .env.example .dockerignore .gitignore AGENTS.md CLAUDE.md MEMORY.md \
   README.md PRODUCTION_READINESS.md requirements.runtime.lock; do
   cp "$ROOT_DIR/$file" "$bundle_dir/$file"

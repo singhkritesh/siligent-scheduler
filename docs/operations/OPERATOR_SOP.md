@@ -229,6 +229,22 @@ explicit confirmation and automatically creates a current-state safety backup.
 does not delete PostgreSQL volumes, configuration, certificates, images, or
 backups. Retention and secure disposal remain separate IT-controlled procedures.
 
+## Controlled Local Disposal
+
+Only use this after the practice's approved retention, legal, backup, and secure
+disposal process authorizes destruction of local scheduler data:
+
+```bash
+./purge.sh --yes
+```
+
+The command permanently removes this scheduler's containers, networks, named
+database volume, product-owned API image tags, desktop launcher, and runtime
+state. It does not remove the repository, shared Docker images, `.env`, TLS
+certificates, or backups by default. Add `--remove-local-configuration` to
+remove `.env` and local certificate/key files, and add `--remove-backups` only
+when approved backup disposal is also authorized. The operation is irreversible.
+
 ## After Restart, Update, or Restore
 
 1. Run the health check.

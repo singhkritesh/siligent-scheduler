@@ -50,7 +50,10 @@ local secrets on first use and refuses placeholder values. `./stop.sh` stops
 containers without deleting volumes.
 
 Never run `docker compose down -v` against production. Volume deletion is not a
-normal uninstallation or upgrade operation.
+normal uninstallation or upgrade operation. For an approved, documented local
+disposal, use the guarded `./purge.sh --yes` command instead. It scopes removal
+to this scheduler stack and requires additional explicit flags before deleting
+local configuration, TLS material, or backups.
 
 Build a platform-specific release on a controlled build workstation:
 

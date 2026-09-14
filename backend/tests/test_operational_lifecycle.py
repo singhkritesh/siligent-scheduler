@@ -31,6 +31,7 @@ class OperationalLifecycleTests(unittest.TestCase):
             "backup.sh",
             "restore.sh",
             "uninstall.sh",
+            "purge.sh",
             "scripts/initialize-local-config.sh",
             "scripts/healthcheck.sh",
             "scripts/install_desktop_launcher.sh",
@@ -239,6 +240,18 @@ class OperationalLifecycleTests(unittest.TestCase):
         self.assertIn("were preserved", uninstall)
         for prohibited in ("down -v", "volume rm", "system prune"):
             self.assertNotIn(prohibited, uninstall)
+
+    def test_purge_is_explicit_and_scoped_to_scheduler_resources(self) -> None:
+        purge = self.read("purge.sh")
+
+        self.assertIn("--yes", purge)
+        self.assertIn("--remove-local-configuration", purge)
+        self.assertIn("--remove-backups", purge)
+        self.assertIn("down --volumes --remove-orphans", purge)
+        self.assertIn("product-owned", purge)
+        self.assertIn("siligent-scheduler-api", purge)
+        self.assertIn("uninstall_desktop_launcher.sh", purge)
+        self.assertNotIn("system prune", purge)
 
     def test_windows_native_entry_points_share_the_checked_lifecycle(self) -> None:
         install = self.read("deploy/windows/install.ps1")
