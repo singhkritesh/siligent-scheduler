@@ -48,9 +48,11 @@ recoverability, host storage encryption, or complete HIPAA compliance.
 - Begin on **Home** and follow the role-specific action queue. Use **Today** for
   arrival, seating, outcome, walk-in, and protected rescheduling work; use
   **Calendar** to review month or annual appointment density.
-- In **Schedule patient**, complete the four steps in order: find the existing
-  patient or enter a new identity, select treatment, set acceptable availability,
-  then compare feasible openings. Search the patient directory before creating a
+- In **Schedule patient**, complete the three steps in order: identify the patient
+  and clinician-approved treatment, review optional preferences, then compare
+  feasible openings. Leave **Patient can take any available opening** selected
+  for the basic workflow. Turn it off only when the patient supplied real date or
+  time limits. Search the patient directory before creating a
   new identity to reduce duplicate records.
 - Use **About this page** when a workspace or safety consequence is unclear. The
   guidance is optional and does not expose help content to an external service.
@@ -92,12 +94,14 @@ recoverability, host storage encryption, or complete HIPAA compliance.
 
 - Use **Settings > Team and access** for support providers and unique user
   accounts.
-- Use **Settings > Availability** for reserved procedure blocks, provider leave,
+- Use **Settings > Doctor blocks** for doctor procedure blocks, provider leave,
   daily overrides, and full-practice closures.
-- To protect procedure capacity, create a reserved block with the dentist,
+- To protect procedure capacity, create a doctor procedure block with the dentist,
   procedure, start/end time, operational reason, and optional eligible room,
-  required equipment unit, or automatic release time. The system rejects a block
-  that intersects a held or confirmed appointment.
+  required equipment unit, automatic release time, or weekly repeat-through date.
+  The system expands a weekly series into exact dated records and rejects the
+  complete series if any occurrence is outside doctor hours, qualification dates,
+  the rolling horizon, overlaps leave/closure, or intersects protected capacity.
 - Release an active block through its **Release** action and record the reason.
   Do not attempt to edit or delete block history. Fulfilled, released, and
   automatically released blocks remain available as audit evidence.
@@ -116,9 +120,13 @@ Use **Insights > Simulation** to test a de-identified set of incoming requests
 without changing the practice calendar.
 
 1. Download the blank CSV template from the page, or prepare a CSV/XLSX workbook
-   whose first worksheet uses the displayed schema. Use opaque values such as
+   whose first worksheet contains `request_id`, `patient_ref`, and
+   `procedure_code`. Use opaque values such as
    `PAT-001` for `patient_ref`; never include a name, MRN, date of birth, phone,
    email, address, condition narrative, or notes.
+   The basic upload assumes standard complexity, routine priority, and any opening
+   in the rolling year. Add advanced columns only when the scenario needs explicit
+   dates, daily times, priority, complexity, request arrival, or doctor preference.
 2. Select the file and choose **Validate and preview**. Validation is all-or-none.
    Resolve any rejected column, code, duplicate, date, status, or formula before
    proceeding. Review row count, date range, procedure mix, and the count of

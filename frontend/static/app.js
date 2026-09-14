@@ -38,7 +38,7 @@ const $$ = (selector) => [...document.querySelectorAll(selector)];
 const VIEW_META = {
   home: { title: "Home", subtitle: "Your next actions and practice status.", roles: ["administrator", "scheduler", "clinician", "auditor"] },
   operations: { title: "Today", subtitle: "Run the patient day in the order events actually happen.", roles: ["administrator", "scheduler", "clinician"] },
-  scheduler: { title: "Schedule patient", subtitle: "Find a feasible doctor, room, and time in four clear steps.", roles: ["administrator", "scheduler", "clinician"] },
+  scheduler: { title: "Schedule patient", subtitle: "Find a feasible doctor, room, and time in three clear steps.", roles: ["administrator", "scheduler", "clinician"] },
   waitlist: { title: "ASAP waitlist", subtitle: "Work earlier-opening requests without disturbing locked visits.", roles: ["administrator", "scheduler", "clinician"] },
   calendar: { title: "Calendar", subtitle: "Review future appointments across the rolling one-year horizon.", roles: ["administrator", "scheduler", "clinician"] },
   analytics: { title: "Reports", subtitle: "Review descriptive local operational patterns.", roles: ["administrator", "scheduler", "clinician"] },
@@ -62,7 +62,7 @@ const HELP = {
   },
   scheduler: {
     purpose: "Use Schedule patient to find and lock one feasible appointment.",
-    tasks: ["Find or add a patient", "Select clinician-approved treatment", "Set availability and compare openings"],
+    tasks: ["Find or add a patient", "Select clinician-approved treatment", "Compare feasible openings; add patient limits only when needed"],
     safety: "A search never moves an existing visit. Reserved-block overrides require an authorized role, an exact option, and a recorded reason.",
     access: "Schedulers, clinicians, and administrators.",
   },
@@ -92,7 +92,7 @@ const HELP = {
   },
   configuration: {
     purpose: "Use Settings to maintain the inputs that determine feasibility and staff access.",
-    tasks: ["Maintain people and access", "Create or release reserved procedure blocks", "Manage availability, resources, and approved procedure rules"],
+    tasks: ["Maintain people and access", "Create or release doctor procedure blocks", "Manage supporting availability, resources, and approved procedure rules"],
     safety: "Never change policy merely to clear an error or manufacture an opening. Existing confirmed visits remain fixed.",
     access: "Administrators; clinical policy and duration changes also require authorized clinical approval.",
   },
@@ -339,7 +339,7 @@ async function bootstrap() {
 function setDateDefaults(now = new Date()) {
   const min = isoDate(now);
   const max = isoDate(addDays(now, 365));
-  ["#date-from", "#date-to", "#waitlist-from", "#waitlist-to", "#reschedule-from", "#reschedule-to", "#operations-date", "#shift-date"].forEach((id) => {
+  ["#date-from", "#date-to", "#waitlist-from", "#waitlist-to", "#reschedule-from", "#reschedule-to", "#operations-date", "#shift-date", "#reserved-block-repeat-until"].forEach((id) => {
     $(id).min = min;
     $(id).max = max;
   });
@@ -484,7 +484,7 @@ async function loadHome() {
   } else {
     $("#role-panel-title").textContent = "Scheduling priorities";
     renderRoleTasks([
-      ["Schedule a new patient", "Find a feasible opening in four steps.", "scheduler"],
+      ["Schedule a new patient", "Find a feasible opening in three steps.", "scheduler"],
       ["Work the ASAP queue", `${data.metrics.waitlist} request(s) currently active.`, "waitlist"],
       ["Run today’s schedule", "Check patients in and record outcomes.", "operations"],
     ]);
@@ -508,7 +508,7 @@ function validateStep(step) {
 }
 
 function setScheduleStep(step, force = false) {
-  const bounded = Math.min(4, Math.max(1, Number(step)));
+  const bounded = Math.min(3, Math.max(1, Number(step)));
   if (!force && bounded > state.maxScheduleStep) return;
   state.scheduleStep = bounded;
   state.maxScheduleStep = Math.max(state.maxScheduleStep, bounded);
@@ -532,11 +532,13 @@ function resetSchedule() {
   $("#patient-search-results").innerHTML = "";
   $("#intake-summary").hidden = true;
   $("#recommendations").className = "empty-state";
-  $("#recommendations").innerHTML = '<div class="empty-mark">⌕</div><h3>Search has not run</h3><p>Go back to availability and find feasible openings.</p>';
+  $("#recommendations").innerHTML = '<div class="empty-mark">⌕</div><h3>Search has not run</h3><p>Go back and find feasible openings.</p>';
   state.recommendations = [];
   state.pendingCandidate = null;
   state.intakeConfirmationRequired = false;
   state.maxScheduleStep = 1;
+  $("#patient-always-available").checked = true;
+  updatePatientAvailabilityControls();
   populateProcedurePreview();
   setScheduleStep(1, true);
 }
@@ -546,6 +548,14 @@ function prepareWalkIn() {
   $("#walk-in").checked = true;
   $("#date-from").value = isoDate(new Date());
   $("#date-to").value = isoDate(new Date());
+}
+
+function updatePatientAvailabilityControls() {
+  const custom = !$("#patient-always-available").checked;
+  $("#custom-patient-availability").hidden = !custom;
+  ["#date-from", "#date-to", "#time-from", "#time-to"].forEach((id) => {
+    $(id).required = custom;
+  });
 }
 
 async function searchPatients() {
@@ -582,7 +592,7 @@ async function searchPatients() {
 
 async function searchRecommendations(event) {
   event.preventDefault();
-  if (!validateStep(3)) return;
+  if (!validateStep(2)) return;
   const button = $("#recommend-button");
   loading(button, true);
   try {
@@ -593,6 +603,7 @@ async function searchRecommendations(event) {
         medical_record_number: $("#patient-mrn").value.trim(),
         procedure_code: $("#procedure").value,
         condition: $("#condition").value,
+        patient_always_available: $("#patient-always-available").checked,
         date_from: $("#date-from").value,
         date_to: $("#date-to").value,
         time_from: $("#time-from").value,
@@ -610,8 +621,8 @@ async function searchRecommendations(event) {
     $("#intake-summary").hidden = false;
     $("#intake-summary").innerHTML = `<strong>${escapeHtml(data.intake.priority.replaceAll("_", " "))} priority</strong> · ${escapeHtml(data.intake.tags.join(", ") || "no condition tags")} · local source ${escapeHtml(data.intake.source)} · attendance risk ${escapeHtml(Math.round(risk.probability * 100))}% (${escapeHtml(risk.basis)})`;
     renderRecommendations(data.candidates);
-    state.maxScheduleStep = 4;
-    setScheduleStep(4, true);
+    state.maxScheduleStep = 3;
+    setScheduleStep(3, true);
     if (!data.candidates.length && $("#waitlist-consent").checked) success("Added to ASAP waitlist", "No feasible opening was found, so the consented request remains available for cancellation recovery.");
   } catch (error) {
     toast(error.message, true);
@@ -624,7 +635,7 @@ function renderRecommendations(candidates) {
   const container = $("#recommendations");
   if (!candidates.length) {
     container.className = "empty-state";
-    container.innerHTML = '<div class="empty-mark">0</div><h3>No feasible opening</h3><p>All hard constraints were preserved. Change the acceptable availability or use the ASAP waitlist.</p>';
+    container.innerHTML = '<div class="empty-mark">0</div><h3>No feasible opening</h3><p>All hard constraints were preserved. Review doctor procedure blocks and resource coverage, try a custom patient window, or use the ASAP waitlist.</p>';
     return;
   }
   container.className = "recommendations";
@@ -830,8 +841,8 @@ async function findWaitlistMatches(button) {
     $("#intake-summary").hidden = false;
     $("#intake-summary").innerHTML = "<strong>Waitlist match</strong> · the existing request has already been reviewed";
     renderRecommendations(data.candidates);
-    state.maxScheduleStep = 4;
-    setScheduleStep(4, true);
+    state.maxScheduleStep = 3;
+    setScheduleStep(3, true);
     navigate("scheduler");
     if (!data.candidates.length) toast("No current match; the patient remains active on the waitlist.", true);
   } catch (error) {
@@ -966,7 +977,7 @@ function renderSimulationPreview(data) {
     ["Policy substitutions", summary.duration_policy_adjustments + summary.production_policy_adjustments],
   ].map(([label, value]) => `<span><small>${escapeHtml(label)}</small><strong>${escapeHtml(value)}</strong></span>`).join("");
   $("#simulation-policy-note").textContent = `${summary.policy_note} Showing ${data.preview_rows.length} of ${summary.row_count} validated rows.`;
-  $("#simulation-preview-table").innerHTML = `<table><thead><tr><th>Patient ref</th><th>Procedure</th><th>Complexity</th><th>Priority</th><th>Available dates</th><th>Daily time</th><th>Preferred dentist</th></tr></thead><tbody>${data.preview_rows.map((row) => `<tr><td>${escapeHtml(row.patient_ref)}</td><td>${escapeHtml(row.procedure_code)}</td><td>${escapeHtml(row.difficulty)}</td><td>${escapeHtml(row.priority)}</td><td>${escapeHtml(row.availability_start_date)}–${escapeHtml(row.availability_end_date)}</td><td>${escapeHtml(row.daily_start_time)}–${escapeHtml(row.daily_end_time)}</td><td>${escapeHtml(row.preferred_doctor_code || "Best available")}</td></tr>`).join("")}</tbody></table>`;
+  $("#simulation-preview-table").innerHTML = `<table><thead><tr><th>Patient ref</th><th>Procedure</th><th>Complexity</th><th>Priority</th><th>Availability</th><th>Preferred dentist</th></tr></thead><tbody>${data.preview_rows.map((row) => `<tr><td>${escapeHtml(row.patient_ref)}</td><td>${escapeHtml(row.procedure_code)}</td><td>${escapeHtml(row.difficulty)}</td><td>${escapeHtml(row.priority)}</td><td>${row.availability_assumption === "any_opening" ? "Any opening" : `${escapeHtml(row.availability_start_date)}–${escapeHtml(row.availability_end_date)}<small>${escapeHtml(row.daily_start_time)}–${escapeHtml(row.daily_end_time)}</small>`}</td><td>${escapeHtml(row.preferred_doctor_code || "Best available")}</td></tr>`).join("")}</tbody></table>`;
 }
 
 async function previewSimulation(event) {
@@ -1119,7 +1130,7 @@ async function loadConfiguration() {
 function renderReservedBlocks() {
   const container = $("#configuration-reserved-blocks");
   const blocks = state.reservedBlocks.filter((item) => item.status === "active");
-  container.innerHTML = blocks.map((item) => `<article class="resource-item reserved-block-item"><span><strong>${escapeHtml(formatDateTime(item.starts_at))}–${escapeHtml(formatTime(item.ends_at))}</strong><small>${escapeHtml(item.doctor_name)} · ${escapeHtml(item.procedure_name)}${item.room_name ? ` · ${escapeHtml(item.room_name)}` : ""}${item.equipment_name ? ` · ${escapeHtml(item.equipment_name)} unit ${escapeHtml(item.equipment_unit_number)}` : ""}${item.release_at ? ` · releases ${escapeHtml(formatDateTime(item.release_at))}` : ""}</small></span><button class="button quiet reserved-block-release" data-id="${escapeHtml(item.id)}" type="button">Release</button></article>`).join("") || '<div class="empty-state compact"><p>No active reserved procedure blocks.</p></div>';
+  container.innerHTML = blocks.map((item) => `<article class="resource-item reserved-block-item"><span><strong>${escapeHtml(formatDateTime(item.starts_at))}–${escapeHtml(formatTime(item.ends_at))}</strong><small>${escapeHtml(item.doctor_name)} · ${escapeHtml(item.procedure_name)}${item.room_name ? ` · ${escapeHtml(item.room_name)}` : ""}${item.equipment_name ? ` · ${escapeHtml(item.equipment_name)} unit ${escapeHtml(item.equipment_unit_number)}` : ""}${item.release_at ? ` · releases ${escapeHtml(formatDateTime(item.release_at))}` : ""}</small></span><button class="button quiet reserved-block-release" data-id="${escapeHtml(item.id)}" type="button">Release</button></article>`).join("") || '<div class="empty-state compact"><p>No active doctor procedure blocks.</p></div>';
   container.querySelectorAll(".reserved-block-release").forEach((button) => button.addEventListener("click", () => openReservedBlockRelease(button.dataset.id)));
 }
 
@@ -1129,7 +1140,7 @@ async function createReservedBlock(event) {
   const equipment = $("#reserved-block-equipment").value.split(":");
   loading(button, true);
   try {
-    await api("/api/configuration/reserved-blocks", { method: "POST", body: JSON.stringify({
+    const result = await api("/api/configuration/reserved-blocks", { method: "POST", body: JSON.stringify({
       doctor_id: $("#reserved-block-doctor").value,
       procedure_code: $("#reserved-block-procedure").value,
       starts_at: practiceLocalToIso($("#reserved-block-start").value),
@@ -1138,9 +1149,10 @@ async function createReservedBlock(event) {
       equipment_id: equipment.length === 2 ? equipment[0] : null,
       equipment_unit_number: equipment.length === 2 ? Number(equipment[1]) : null,
       release_at: $("#reserved-block-release-at").value ? practiceLocalToIso($("#reserved-block-release-at").value) : null,
+      repeat_weekly_until: $("#reserved-block-repeat-until").value || null,
       reason: $("#reserved-block-reason").value,
     }) });
-    success("Reserved procedure block created", "Only the matching doctor and procedure may use this protected time unless an exact override is authorized.");
+    success(`${result.count} doctor procedure block${result.count === 1 ? "" : "s"} created`, "Only the matching doctor and procedure may use this protected time unless an exact override is authorized.");
     event.target.reset();
     closeEditor(event.target);
     state.calendarLoaded = false;
@@ -1647,6 +1659,7 @@ function bindEvents() {
   $("#patient-search-button").addEventListener("click", searchPatients);
   $("#patient-search").addEventListener("keydown", (event) => { if (event.key === "Enter") { event.preventDefault(); searchPatients(); } });
   $("#procedure").addEventListener("change", populateProcedurePreview);
+  $("#patient-always-available").addEventListener("change", updatePatientAvailabilityControls);
   $$("[data-next-step]").forEach((button) => button.addEventListener("click", () => { if (validateStep(state.scheduleStep)) { state.maxScheduleStep = Math.max(state.maxScheduleStep, Number(button.dataset.nextStep)); setScheduleStep(button.dataset.nextStep, true); } }));
   $$("[data-previous-step]").forEach((button) => button.addEventListener("click", () => setScheduleStep(button.dataset.previousStep, true)));
   $$("[data-step-target]").forEach((button) => button.addEventListener("click", () => setScheduleStep(button.dataset.stepTarget)));

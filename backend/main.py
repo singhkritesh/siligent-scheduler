@@ -53,10 +53,11 @@ class RecommendationBody(TrimmedBody):
     medical_record_number: str = Field(min_length=2, max_length=80)
     procedure_code: str = Field(min_length=1, max_length=80)
     condition: str = Field(default="", max_length=4000)
-    date_from: date
-    date_to: date
-    time_from: time
-    time_to: time
+    patient_always_available: bool | None = None
+    date_from: date | None = None
+    date_to: date | None = None
+    time_from: time | None = None
+    time_to: time | None = None
     preferred_doctor_id: str | None = None
     difficulty: str = Field(default="standard", pattern="^(standard|complex)$")
     waitlist_consent: bool = False
@@ -234,6 +235,7 @@ class ReservedProcedureBlockBody(TrimmedBody):
     equipment_id: str | None = None
     equipment_unit_number: int | None = Field(default=None, ge=1, le=100)
     release_at: datetime | None = None
+    repeat_weekly_until: date | None = None
     reason: str = Field(min_length=3, max_length=500)
 
 
@@ -273,9 +275,65 @@ def validate_window(date_from: date, date_to: date, time_from: time, time_to: ti
         raise HTTPException(status_code=422, detail="Search exceeds the rolling one-year horizon")
 
 
+def recommendation_window(body: RecommendationBody) -> tuple[date, date, time, time, bool]:
+    """Resolve the default any-opening assumption into an explicit audited window."""
+
+    timezone = ZoneInfo(settings.practice_timezone)
+    today = datetime.now(timezone).date()
+    if body.walk_in:
+        date_from = date_to = today
+        time_from = body.time_from or time.min
+        time_to = body.time_to or time(23, 59)
+        uses_any_opening = False
+    elif body.patient_always_available is True or (
+        body.patient_always_available is None
+        and all(value is None for value in (body.date_from, body.date_to, body.time_from, body.time_to))
+    ):
+        date_from = today
+        date_to = today + timedelta(days=settings.scheduling_horizon_days)
+        time_from = time.min
+        time_to = time(23, 59)
+        uses_any_opening = True
+    else:
+        if None in (body.date_from, body.date_to, body.time_from, body.time_to):
+            raise HTTPException(
+                status_code=422,
+                detail="Custom patient availability requires both dates and both daily times",
+            )
+        date_from = body.date_from
+        date_to = body.date_to
+        time_from = body.time_from
+        time_to = body.time_to
+        uses_any_opening = False
+    validate_window(date_from, date_to, time_from, time_to)
+    return date_from, date_to, time_from, time_to, uses_any_opening
+
+
 def require_aware_datetime(value: datetime, label: str) -> None:
     if value.tzinfo is None or value.utcoffset() is None:
         raise HTTPException(status_code=422, detail=f"{label} must include a timezone offset")
+
+
+def weekly_block_occurrences(
+    local_start: datetime,
+    local_end: datetime,
+    local_release: datetime | None,
+    repeat_until: date,
+) -> tuple[tuple[datetime, datetime, datetime | None], ...]:
+    """Expand one local wall-clock block into exact weekly audited occurrences."""
+
+    occurrences: list[tuple[datetime, datetime, datetime | None]] = []
+    offset = 0
+    while (local_start + timedelta(weeks=offset)).date() <= repeat_until:
+        occurrences.append(
+            (
+                local_start + timedelta(weeks=offset),
+                local_end + timedelta(weeks=offset),
+                local_release + timedelta(weeks=offset) if local_release else None,
+            )
+        )
+        offset += 1
+    return tuple(occurrences)
 
 
 def release_expired_reserved_blocks(
@@ -899,13 +957,7 @@ def recommendations(
     body: RecommendationBody,
     user: dict = Depends(require_roles("administrator", "scheduler", "clinician")),
 ):
-    validate_window(body.date_from, body.date_to, body.time_from, body.time_to)
-    today = datetime.now(ZoneInfo(settings.practice_timezone)).date()
-    if body.walk_in and (body.date_from != today or body.date_to != today):
-        raise HTTPException(
-            status_code=422,
-            detail="A walk-in is onsite and must be searched on the current practice date",
-        )
+    date_from, date_to, time_from, time_to, uses_any_opening = recommendation_window(body)
     if body.allow_reserved_block_override and user["role"] not in {"administrator", "clinician"}:
         raise HTTPException(
             status_code=403,
@@ -963,8 +1015,8 @@ def recommendations(
                 intake.source,
                 intake.confidence,
                 intake.priority,
-                body.date_from,
-                body.date_to,
+                date_from,
+                date_to,
                 body.difficulty,
                 body.waitlist_consent,
                 body.walk_in,
@@ -972,8 +1024,8 @@ def recommendations(
             ),
         ).fetchone()["id"]
         timezone = ZoneInfo(settings.practice_timezone)
-        for day in daterange(body.date_from, body.date_to):
-            interval = local_interval(day, body.time_from, body.time_to, timezone)
+        for day in daterange(date_from, date_to):
+            interval = local_interval(day, time_from, time_to, timezone)
             connection.execute(
                 "INSERT INTO patient_availability (scheduling_request_id, available_during) VALUES (%s, tstzrange(%s, %s, '[)'))",
                 (request_id, interval.start, interval.end),
@@ -983,10 +1035,10 @@ def recommendations(
             scheduling_request_id=str(request_id),
             patient_id=str(patient_id),
             procedure=procedure,
-            start_date=body.date_from,
-            end_date=body.date_to,
-            start_time=body.time_from,
-            end_time=body.time_to,
+            start_date=date_from,
+            end_date=date_to,
+            start_time=time_from,
+            end_time=time_to,
             preferred_doctor_id=body.preferred_doctor_id,
             actor_id=user["id"],
             priority=intake.priority,
@@ -1013,7 +1065,7 @@ def recommendations(
                 """,
                 (
                     patient_id, procedure["id"], body.preferred_doctor_id,
-                    body.date_from, body.date_to, body.time_from, body.time_to,
+                    date_from, date_to, time_from, time_to,
                     intake.priority, "Added automatically after no feasible slot", user["id"],
                 ),
             )
@@ -1027,11 +1079,13 @@ def recommendations(
             details={
                 "candidate_count": len(candidates),
                 "model_source": intake.source,
+                "patient_always_available": uses_any_opening,
                 "reserved_block_override_search": body.allow_reserved_block_override,
             },
         )
     return {
         "request_id": str(request_id),
+        "availability_assumption": "any_opening" if uses_any_opening else "custom_window",
         "intake": {
             "tags": intake.tags,
             "priority": intake.priority,
@@ -2312,12 +2366,26 @@ def create_reserved_block(
     now = datetime.now(timezone)
     local_start = body.starts_at.astimezone(timezone)
     local_end = body.ends_at.astimezone(timezone)
+    if local_start.date() != local_end.date():
+        raise HTTPException(status_code=422, detail="A doctor procedure block must start and end on the same practice date")
     if local_start < now:
         raise HTTPException(status_code=422, detail="Reserved blocks must start in the future")
     if local_end.date() > now.date() + timedelta(days=settings.scheduling_horizon_days):
         raise HTTPException(status_code=422, detail="Block exceeds the rolling one-year horizon")
     if body.release_at and not (now < body.release_at.astimezone(timezone) < local_end):
         raise HTTPException(status_code=422, detail="Automatic release must be in the future and before block end")
+    repeat_until = body.repeat_weekly_until or local_start.date()
+    if repeat_until < local_start.date():
+        raise HTTPException(status_code=422, detail="Weekly repeat end cannot precede the first block")
+    if repeat_until > now.date() + timedelta(days=settings.scheduling_horizon_days):
+        raise HTTPException(status_code=422, detail="Weekly repeat exceeds the rolling one-year horizon")
+    local_release = body.release_at.astimezone(timezone) if body.release_at else None
+    occurrences = weekly_block_occurrences(
+        local_start, local_end, local_release, repeat_until
+    )
+    for occurrence_start, occurrence_end, _ in occurrences:
+        if occurrence_end.date() > now.date() + timedelta(days=settings.scheduling_horizon_days):
+            raise HTTPException(status_code=422, detail="A repeated block exceeds the rolling one-year horizon")
 
     correlation_id = str(uuid.uuid4())
     try:
@@ -2330,22 +2398,16 @@ def create_reserved_block(
                 (body.procedure_code,),
             ).fetchone()
             doctor = connection.execute(
-                "SELECT id, display_name FROM doctors WHERE id = %s AND active",
+                """
+                SELECT d.id, d.display_name, pv.id AS provider_id
+                  FROM doctors d
+                  JOIN providers pv ON pv.doctor_id = d.id AND pv.active
+                 WHERE d.id = %s AND d.active
+                """,
                 (body.doctor_id,),
             ).fetchone()
             if not procedure or not doctor:
                 raise HTTPException(status_code=404, detail="Active doctor or procedure not found")
-            qualified = connection.execute(
-                """
-                SELECT 1 FROM doctor_procedure_qualifications
-                 WHERE doctor_id = %s AND procedure_id = %s
-                   AND effective_from <= %s
-                   AND (effective_through IS NULL OR effective_through >= %s)
-                """,
-                (doctor["id"], procedure["id"], local_start.date(), local_end.date()),
-            ).fetchone()
-            if not qualified:
-                raise HTTPException(status_code=422, detail="Doctor is not qualified for this procedure on the block date")
             if body.room_id:
                 eligible_room = connection.execute(
                     """
@@ -2357,39 +2419,127 @@ def create_reserved_block(
                 ).fetchone()
                 if not eligible_room:
                     raise HTTPException(status_code=422, detail="Room is not eligible for this procedure")
-            block_id = connection.execute(
-                """
-                INSERT INTO reserved_procedure_blocks (
-                    doctor_id, procedure_id, room_id, equipment_id,
-                    equipment_unit_number, reserved_during, release_at,
-                    reason, created_by
-                ) VALUES (%s, %s, %s, %s, %s, tstzrange(%s, %s, '[)'), %s, %s, %s)
-                RETURNING id
-                """,
-                (
-                    doctor["id"], procedure["id"], body.room_id,
-                    body.equipment_id, body.equipment_unit_number,
-                    body.starts_at, body.ends_at, body.release_at,
-                    body.reason.strip(), user["id"],
-                ),
-            ).fetchone()["id"]
-            append_audit(
-                connection,
-                actor_id=user["id"],
-                event_type="reserved_block.created",
-                entity_type="reserved_procedure_block",
-                entity_id=str(block_id),
-                correlation_id=correlation_id,
-                details={
-                    "doctor_id": str(doctor["id"]),
-                    "procedure_code": body.procedure_code,
-                    "room_reserved": bool(body.room_id),
-                    "equipment_reserved": bool(body.equipment_id),
-                },
-            )
+            block_ids: list[str] = []
+            for occurrence_number, (occurrence_start, occurrence_end, occurrence_release) in enumerate(occurrences, 1):
+                shift = connection.execute(
+                    """
+                    SELECT status, local_start, local_end
+                      FROM provider_shift_overrides
+                     WHERE provider_id = %s AND shift_date = %s
+                    """,
+                    (doctor["provider_id"], occurrence_start.date()),
+                ).fetchone()
+                local_start_time = occurrence_start.time().replace(tzinfo=None)
+                local_end_time = occurrence_end.time().replace(tzinfo=None)
+                if shift:
+                    within_hours = (
+                        shift["status"] != "off"
+                        and shift["local_start"] is not None
+                        and shift["local_end"] is not None
+                        and shift["local_start"] <= local_start_time
+                        and shift["local_end"] >= local_end_time
+                    )
+                else:
+                    within_hours = bool(connection.execute(
+                        """
+                        SELECT 1 FROM provider_working_hours
+                         WHERE provider_id = %s AND weekday = %s
+                           AND local_start <= %s AND local_end >= %s
+                           AND effective_from <= %s
+                           AND (effective_through IS NULL OR effective_through >= %s)
+                        """,
+                        (
+                            doctor["provider_id"], occurrence_start.weekday(),
+                            local_start_time, local_end_time,
+                            occurrence_start.date(), occurrence_start.date(),
+                        ),
+                    ).fetchone())
+                if not within_hours:
+                    raise HTTPException(
+                        status_code=422,
+                        detail=f"Doctor is not working for the complete block on {occurrence_start.date().isoformat()}",
+                    )
+                unavailable = connection.execute(
+                    """
+                    SELECT 1
+                      FROM provider_unavailability
+                     WHERE provider_id = %s
+                       AND unavailable_during && tstzrange(%s, %s, '[)')
+                    UNION ALL
+                    SELECT 1
+                      FROM practice_closures
+                     WHERE closed_during && tstzrange(%s, %s, '[)')
+                     LIMIT 1
+                    """,
+                    (
+                        doctor["provider_id"], occurrence_start, occurrence_end,
+                        occurrence_start, occurrence_end,
+                    ),
+                ).fetchone()
+                if unavailable:
+                    raise HTTPException(
+                        status_code=409,
+                        detail=f"Doctor procedure block overlaps leave or a closure on {occurrence_start.date().isoformat()}",
+                    )
+                qualified = connection.execute(
+                    """
+                    SELECT 1 FROM doctor_procedure_qualifications
+                     WHERE doctor_id = %s AND procedure_id = %s
+                       AND effective_from <= %s
+                       AND (effective_through IS NULL OR effective_through >= %s)
+                    """,
+                    (
+                        doctor["id"], procedure["id"],
+                        occurrence_start.date(), occurrence_end.date(),
+                    ),
+                ).fetchone()
+                if not qualified:
+                    raise HTTPException(
+                        status_code=422,
+                        detail=f"Doctor is not qualified for this procedure on {occurrence_start.date().isoformat()}",
+                    )
+                block_id = connection.execute(
+                    """
+                    INSERT INTO reserved_procedure_blocks (
+                        doctor_id, procedure_id, room_id, equipment_id,
+                        equipment_unit_number, reserved_during, release_at,
+                        reason, created_by
+                    ) VALUES (%s, %s, %s, %s, %s, tstzrange(%s, %s, '[)'), %s, %s, %s)
+                    RETURNING id
+                    """,
+                    (
+                        doctor["id"], procedure["id"], body.room_id,
+                        body.equipment_id, body.equipment_unit_number,
+                        occurrence_start, occurrence_end, occurrence_release,
+                        body.reason.strip(), user["id"],
+                    ),
+                ).fetchone()["id"]
+                block_ids.append(str(block_id))
+                append_audit(
+                    connection,
+                    actor_id=user["id"],
+                    event_type="reserved_block.created",
+                    entity_type="reserved_procedure_block",
+                    entity_id=str(block_id),
+                    correlation_id=correlation_id,
+                    details={
+                        "doctor_id": str(doctor["id"]),
+                        "procedure_code": body.procedure_code,
+                        "room_reserved": bool(body.room_id),
+                        "equipment_reserved": bool(body.equipment_id),
+                        "weekly_series": len(occurrences) > 1,
+                        "occurrence": occurrence_number,
+                        "occurrence_count": len(occurrences),
+                    },
+                )
     except (psycopg.errors.ExclusionViolation, psycopg.errors.RaiseException) as exc:
         raise HTTPException(status_code=409, detail=str(exc).splitlines()[0]) from exc
-    return {"id": str(block_id), "status": "active"}
+    return {
+        "id": block_ids[0],
+        "ids": block_ids,
+        "count": len(block_ids),
+        "status": "active",
+    }
 
 
 @app.post("/api/configuration/reserved-blocks/{block_id}/release")

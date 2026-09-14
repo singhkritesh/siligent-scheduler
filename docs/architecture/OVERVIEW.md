@@ -136,8 +136,10 @@ interval; exclusion constraints prevent double use.
 - Standard and complex cases use separate phase durations.
 - Daily shift overrides replace recurring hours for that date and can identify
   the provider covering an absent teammate.
-- Reserved procedure blocks protect a doctor/time interval and optional room or
-  equipment unit for a named procedure. Normal search treats nonmatching use as
+- Doctor procedure blocks protect a doctor/time interval and optional room or
+  equipment unit for a named procedure. They may be created once or as exact
+  weekly occurrences, and are accepted only inside the doctor’s working hours
+  without leave or closure conflicts. Normal search treats nonmatching use as
   infeasible. An administrator/clinician override is explicit, reasoned,
   short-lived, single-use, exact-scope, and transactionally rechecked.
 - Walk-ins use the same hard-constraint search, then move through explicit

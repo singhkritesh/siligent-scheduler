@@ -21,14 +21,14 @@ REQUIRED_COLUMNS = (
     "request_id",
     "patient_ref",
     "procedure_code",
+)
+OPTIONAL_COLUMNS = (
     "difficulty",
     "priority",
     "availability_start_date",
     "availability_end_date",
     "daily_start_time",
     "daily_end_time",
-)
-OPTIONAL_COLUMNS = (
     "request_received_at",
     "condition_tag",
     "preferred_doctor_code",
@@ -299,16 +299,59 @@ def parse_simulation_upload(
         procedure_code = str(item["procedure_code"]).lower()
         if not CODE_PATTERN.fullmatch(procedure_code):
             raise SimulationImportError(f"{prefix}: procedure_code is invalid")
-        difficulty = str(item["difficulty"]).lower()
+        received_value = str(item.get("request_received_at", "")).strip()
+        received_at: datetime | None = None
+        if received_value:
+            try:
+                received_at = datetime.fromisoformat(received_value)
+            except ValueError:
+                try:
+                    received_at = _excel_date(received_value, date_1904=date_1904)
+                except (SimulationImportError, OverflowError) as error:
+                    raise SimulationImportError(f"{prefix}: request_received_at is invalid") from error
+            if received_at.tzinfo is not None and received_at.utcoffset() is not None:
+                received_at = received_at.astimezone(UTC)
+            else:
+                received_at = received_at.replace(tzinfo=UTC)
+
+        difficulty = str(item.get("difficulty", "") or "standard").lower()
         if difficulty not in {"standard", "complex"}:
             raise SimulationImportError(f"{prefix}: difficulty must be standard or complex")
-        priority = str(item["priority"]).lower()
+        priority = str(item.get("priority", "") or "routine").lower()
         if priority not in {"routine", "priority", "urgent"}:
             raise SimulationImportError(f"{prefix}: priority must be routine, priority, or urgent")
-        start_date = _date_value(str(item["availability_start_date"]), date_1904=date_1904)
-        end_date = _date_value(str(item["availability_end_date"]), date_1904=date_1904)
-        start_time = _time_value(str(item["daily_start_time"]), date_1904=date_1904)
-        end_time = _time_value(str(item["daily_end_time"]), date_1904=date_1904)
+        start_date_value = str(item.get("availability_start_date", "")).strip()
+        end_date_value = str(item.get("availability_end_date", "")).strip()
+        start_time_value = str(item.get("daily_start_time", "")).strip()
+        end_time_value = str(item.get("daily_end_time", "")).strip()
+        availability_values = (
+            start_date_value, end_date_value, start_time_value, end_time_value
+        )
+        if any(availability_values) and not all(availability_values):
+            raise SimulationImportError(
+                f"{prefix}: custom availability requires both dates and both daily times"
+            )
+        availability_assumption = "custom_window" if all(availability_values) else "any_opening"
+        start_date = (
+            _date_value(start_date_value, date_1904=date_1904)
+            if start_date_value
+            else max(today, received_at.date() if received_at else today)
+        )
+        end_date = (
+            _date_value(end_date_value, date_1904=date_1904)
+            if end_date_value
+            else horizon_end
+        )
+        start_time = (
+            _time_value(start_time_value, date_1904=date_1904)
+            if start_time_value
+            else time.min
+        )
+        end_time = (
+            _time_value(end_time_value, date_1904=date_1904)
+            if end_time_value
+            else time(23, 59)
+        )
         if start_date < today or start_date > horizon_end or end_date > horizon_end:
             raise SimulationImportError(
                 f"{prefix}: availability must fall within the rolling {horizon_days}-day horizon"
@@ -340,23 +383,10 @@ def parse_simulation_upload(
             "expected_production_cents",
             minimum=0,
         )
-        received_value = str(item.get("request_received_at", "")).strip()
-        if received_value:
-            try:
-                received_at = datetime.fromisoformat(received_value)
-            except ValueError:
-                try:
-                    received_at = _excel_date(received_value, date_1904=date_1904)
-                except (SimulationImportError, OverflowError) as error:
-                    raise SimulationImportError(f"{prefix}: request_received_at is invalid") from error
-        else:
+        if received_at is None:
             received_at = datetime.combine(start_date, time.min, tzinfo=UTC) - timedelta(days=1)
         received_date = received_at.date()
         received_local_time = received_at.timetz().replace(tzinfo=None)
-        if received_at.tzinfo is not None and received_at.utcoffset() is not None:
-            received_at = received_at.astimezone(UTC)
-        else:
-            received_at = received_at.replace(tzinfo=UTC)
         if received_date > start_date:
             raise SimulationImportError(
                 f"{prefix}: availability_start_date cannot precede request_received_at"
@@ -384,6 +414,7 @@ def parse_simulation_upload(
                 "availability_end_date": end_date,
                 "daily_start_time": start_time,
                 "daily_end_time": end_time,
+                "availability_assumption": availability_assumption,
                 "preferred_doctor_code": str(item.get("preferred_doctor_code", "")).upper(),
                 "established_doctor_code": str(item.get("established_doctor_code", "")).upper(),
                 "request_source": request_source,
@@ -407,5 +438,6 @@ def serialize_preview_row(row: dict[str, object]) -> dict[str, object]:
         "availability_end_date": row["availability_end_date"].isoformat(),
         "daily_start_time": row["daily_start_time"].strftime("%H:%M"),
         "daily_end_time": row["daily_end_time"].strftime("%H:%M"),
+        "availability_assumption": row["availability_assumption"],
         "preferred_doctor_code": row["preferred_doctor_code"],
     }

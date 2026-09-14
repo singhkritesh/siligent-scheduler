@@ -12,6 +12,7 @@ from backend.main import (
     ProviderCreateBody,
     RecommendationBody,
     UserCreateBody,
+    weekly_block_occurrences,
 )
 from backend.scheduling import _future_patient_windows, _limit_to_effective_dates
 from optimizer.siligent_optimizer import Interval
@@ -53,6 +54,16 @@ class RequestValidationTests(unittest.TestCase):
                 time_to=time(17),
             )
 
+    def test_recommendation_defaults_to_any_opening_without_patient_dates(self) -> None:
+        body = RecommendationBody(
+            patient_name="Example Patient",
+            medical_record_number="MR-1",
+            procedure_code="exam",
+        )
+        self.assertIsNone(body.patient_always_available)
+        self.assertIsNone(body.date_from)
+        self.assertIsNone(body.time_from)
+
     def test_request_models_reject_unknown_fields(self) -> None:
         with self.assertRaises(ValidationError):
             AppointmentStatusBody(
@@ -89,6 +100,18 @@ class RequestValidationTests(unittest.TestCase):
             datetime(2026, 9, 8, 10, tzinfo=timezone),
         )
         self.assertEqual(windows, ())
+
+    def test_weekly_doctor_blocks_preserve_local_time_across_dst(self) -> None:
+        timezone = ZoneInfo("America/New_York")
+        occurrences = weekly_block_occurrences(
+            datetime(2026, 10, 30, 9, tzinfo=timezone),
+            datetime(2026, 10, 30, 12, tzinfo=timezone),
+            None,
+            date(2026, 11, 13),
+        )
+        self.assertEqual(len(occurrences), 3)
+        self.assertEqual([item[0].hour for item in occurrences], [9, 9, 9])
+        self.assertEqual([item[0].utcoffset().total_seconds() for item in occurrences], [-14400, -18000, -18000])
 
 
 if __name__ == "__main__":

@@ -64,6 +64,29 @@ def minimal_xlsx(values: list[str], *, formula_column: int | None = None) -> byt
 
 
 class SimulationImportTests(unittest.TestCase):
+    def test_three_column_csv_defaults_to_any_opening(self) -> None:
+        content = b"request_id,patient_ref,procedure_code\nREQ-1,PAT-1,exam\n"
+        _, rows = parse_simulation_upload(
+            content, "requests.csv", today=date(2026, 9, 8), horizon_days=365
+        )
+        self.assertEqual(rows[0]["difficulty"], "standard")
+        self.assertEqual(rows[0]["priority"], "routine")
+        self.assertEqual(rows[0]["availability_start_date"], date(2026, 9, 8))
+        self.assertEqual(rows[0]["availability_end_date"], date(2027, 9, 8))
+        self.assertEqual(rows[0]["daily_start_time"].isoformat(), "00:00:00")
+        self.assertEqual(rows[0]["daily_end_time"].isoformat(), "23:59:00")
+        self.assertEqual(rows[0]["availability_assumption"], "any_opening")
+
+    def test_partial_custom_availability_is_rejected(self) -> None:
+        content = (
+            b"request_id,patient_ref,procedure_code,availability_start_date\n"
+            b"REQ-1,PAT-1,exam,2026-10-01\n"
+        )
+        with self.assertRaisesRegex(SimulationImportError, "both dates and both daily times"):
+            parse_simulation_upload(
+                content, "requests.csv", today=date(2026, 9, 8), horizon_days=365
+            )
+
     def test_valid_csv_is_normalized_and_sorted_by_arrival(self) -> None:
         header = ",".join(HEADERS + ("request_received_at", "condition_tag"))
         content = (

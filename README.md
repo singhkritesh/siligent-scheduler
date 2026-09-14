@@ -208,17 +208,23 @@ wait, status, and production totals for download. The workflow cannot create,
 cancel, move, or reslot a live appointment. Use opaque `patient_ref` values;
 direct identifiers, free-text condition/notes fields, formulas, unsupported
 columns, reserved-block overrides, and pre-locked input rows are rejected. A
-blank local template is linked from the page.
+blank local template is linked from the page. The basic schema requires only
+`request_id`, `patient_ref`, and `procedure_code`. Missing availability defaults
+to any opening in the current rolling horizon; the former advanced columns remain
+supported for controlled scenarios.
 
-**Schedule patient** is a four-step flow: find or add the patient, select the
-clinician-approved treatment, enter acceptable availability, and choose a fully
-feasible opening. The final review identifies the dentist, timeslot, supporting
+**Schedule patient** is a three-step flow: identify the patient and treatment,
+review optional preferences, and choose a fully feasible opening. The basic flow
+assumes the patient can accept any opening in the rolling year. Staff can turn
+that assumption off and enter a specific date/time window when needed. The final
+review identifies the dentist, timeslot, supporting
 resources, and lock consequence before confirmation. Every page has optional
 **About this page** guidance describing its purpose, common tasks, access, and
 safety rule. Administrators can create unique accounts,
 add operatories, support providers, equipment and full-practice closures, manage
 the daily rota, and record dated staff unavailability. Clinician-controlled
-configuration covers procedure phases and standard/complex duration, production
+configuration includes exact or weekly doctor procedure blocks, procedure phases
+and standard/complex duration, production
 value, dentist preference, supervision limits, and approval of de-identified
 historical calibration recommendations.
 

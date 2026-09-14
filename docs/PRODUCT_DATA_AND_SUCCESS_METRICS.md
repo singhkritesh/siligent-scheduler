@@ -15,12 +15,14 @@ setup.
 
 ## Product Outcome
 
-Given an authorized scheduling request containing patient identity, procedure,
-scheduling context, date/time availability, and optional preferences, the
+Given an authorized scheduling request containing patient identity and procedure,
+plus optional scheduling context and preferences, the
 application returns ranked feasible combinations of doctor, room, supporting
 resources, and timeslot. An authorized staff member reviews and confirms one
 option. The application searches a rolling 365-day horizon and evaluates every
-new request against the latest calendar state.
+new request against the latest calendar state. Patient availability defaults to
+any opening in that horizon and becomes a constraint only when staff records a
+specific patient window.
 
 Deterministic rules convert recognized condition text into an allowlisted set of
 scheduling tags. An optional local language model may add allowlisted tags and
@@ -36,19 +38,20 @@ it does not need historical performance data.
 | Data category | Examples | Why it is used | Required? |
 | --- | --- | --- | --- |
 | Approved practice configuration | Timezone, hours, closures, providers, qualifications, rooms, equipment, procedure phases, durations, buffers, supervision limits | Defines capacity and hard constraints | Reference values are installed; practice validation is required before real-patient use |
-| Current request | Patient identity, procedure, minimum condition context, date range, daily availability, complexity and preferences | Creates the request and searches for suitable times | Yes, only the fields needed for the workflow |
-| Current calendar state | Confirmed appointments, phases, rooms, equipment reservations, leave, shift overrides, and reserved procedure blocks | Prevents conflicts and protects existing commitments or intentionally held capacity | Yes; generated and maintained by normal operation |
+| Current request | Patient identity and procedure; optional condition context, custom availability, complexity, and preferences | Creates the request and searches for suitable times | Patient and procedure are required; other request fields are optional |
+| Current calendar state | Confirmed appointments, phases, rooms, equipment reservations, leave, shift overrides, and doctor procedure blocks | Prevents conflicts and protects existing commitments or intentionally held capacity | Yes; generated and maintained by normal operation |
 | Workforce identity and authorization | Unique account, role, session and approval actor | Enforces least privilege and attributes protected actions | Yes for authenticated use |
 | Historical duration observations | De-identified procedure/provider/date/scheduled/actual/outcome rows | May improve future standard and complex duration proposals | No |
-| Optional simulation requests | Opaque request/patient references, controlled procedure/condition codes, complexity, priority, availability, optional doctor codes and advisory estimates | Replays representative demand against current policy and capacity without booking | No |
+| Optional simulation requests | Required opaque request reference, opaque patient reference, and procedure code; optional complexity, priority, availability, doctor codes, controlled condition code, and advisory estimates | Replays representative demand against current policy and capacity without booking | No |
 | External or cloud data | Cloud inference, telemetry, remote analytics, internet-hosted assets | Not used | No; prohibited at runtime |
 
 ## How Data Is Used
 
 ### Scheduling and confirmation
 
-1. Staff enters or selects the patient and supplies the procedure, minimum
-   condition context, availability, and preferences.
+1. Staff enters or selects the patient and supplies the procedure. The default
+   assumption searches any opening in the rolling year; staff records a custom
+   patient window or preferences only when they apply.
 2. Deterministic intake rules, optionally assisted by the approved local model,
    propose allowlisted scheduling tags and confidence. Staff reviews the
    normalized context when required.
@@ -63,10 +66,12 @@ it does not need historical performance data.
 
 ### Protected procedure capacity
 
-An administrator may reserve a future dentist/time interval for a named
-procedure and optionally an operatory and required equipment unit. The record
+An administrator may reserve one or more exact weekly future dentist/time
+intervals for a named procedure and optionally an operatory and required equipment unit. The record
 contains resource identifiers, start/end, reason, optional release time, status,
-and actor—not patient data. The optimizer permits only a fully contained,
+and actor—not patient data. Every occurrence must fall within working hours and
+avoid leave, closures, existing appointments, and other protected blocks; a
+series succeeds or fails atomically. The optimizer permits only a fully contained,
 resource-matching appointment during normal search. Creating a block is rejected
 if capacity is already occupied, so no booked patient is moved.
 
@@ -119,7 +124,11 @@ evidence.
 The simulation accepts de-identified CSV or XLSX requests and is independent of
 duration calibration. It works with synthetic demand, a locally de-identified
 and date-shifted historical request extract, or a controlled prospective scenario.
-Availability must be mapped into the current rolling horizon. Patient names,
+The basic file requires only `request_id`, `patient_ref`, and `procedure_code`.
+Missing difficulty and priority default to standard and routine; missing
+availability defaults to any opening in the current rolling horizon. Advanced
+columns can still provide explicit arrival, date/time, condition-code, and doctor
+preferences. Patient names,
 MRNs, dates of birth, contact details, addresses, raw conditions, notes,
 unapproved fields, and workbook formulas are rejected.
 

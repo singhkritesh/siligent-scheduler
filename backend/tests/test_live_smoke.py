@@ -131,6 +131,7 @@ class Client:
 
 def main() -> int:
     env = load_env()
+    run_key = datetime.now().strftime("%Y%m%d%H%M%S%f")
     client = Client(f"https://127.0.0.1:{env.get('UI_PORT', '8443')}")
     health = client.request("GET", "/health")
     assert health["status"] == "ok" and health["mode"] == "offline"
@@ -179,6 +180,38 @@ def main() -> int:
     assert all(item["phases"] for item in catalog["procedures"])
 
     today = date.today()
+    any_opening = client.request(
+        "POST",
+        "/api/recommendations",
+        {
+            "patient_name": "Synthetic Any Opening Patient",
+            "medical_record_number": f"SYNTHETIC-ANY-OPENING-{run_key}",
+            "procedure_code": "exam",
+            "condition": "",
+            "patient_always_available": True,
+        },
+    )
+    assert any_opening["availability_assumption"] == "any_opening"
+    assert any_opening["candidates"], "expected capacity for the any-opening workflow"
+
+    basic_simulation = (
+        "request_id,patient_ref,procedure_code\n"
+        "BASIC-REQ-1,BASIC-PAT-1,exam\n"
+        "BASIC-REQ-2,BASIC-PAT-2,cleaning\n"
+    ).encode("utf-8")
+    simulation_preview = client.request_file(
+        "/api/simulations/preview", "basic.csv", basic_simulation, "text/csv"
+    )
+    assert simulation_preview["summary"]["row_count"] == 2
+    assert simulation_preview["preview_rows"][0]["difficulty"] == "standard"
+    assert simulation_preview["preview_rows"][0]["priority"] == "routine"
+    assert simulation_preview["preview_rows"][0]["availability_assumption"] == "any_opening"
+    simulation_result = client.request_file(
+        "/api/simulations/run", "basic.csv", basic_simulation, "text/csv"
+    )
+    assert simulation_result["report"]["row_count"] == 2
+    assert simulation_result["report"]["live_calendar_changed"] is False
+
     existing_blocks = client.request("GET", "/api/reserved-blocks")
     for item in existing_blocks["blocks"]:
         if (
@@ -195,8 +228,8 @@ def main() -> int:
         "/api/recommendations",
         {
             "patient_name": "Synthetic Reserved Block Seed",
-            "medical_record_number": "SYNTHETIC-BLOCK-SEED-001",
-            "procedure_code": "crown",
+            "medical_record_number": f"SYNTHETIC-BLOCK-SEED-{run_key}",
+            "procedure_code": "exam",
             "condition": "",
             "date_from": (today + timedelta(days=45)).isoformat(),
             "date_to": (today + timedelta(days=90)).isoformat(),
@@ -207,7 +240,6 @@ def main() -> int:
     )
     assert block_seed["candidates"], "expected capacity for a synthetic reserved block"
     block_slot = block_seed["candidates"][0]
-    block_equipment = block_slot["equipment"][0] if block_slot["equipment"] else None
     reserved_block = client.request(
         "POST",
         "/api/configuration/reserved-blocks",
@@ -216,9 +248,9 @@ def main() -> int:
             "procedure_code": "crown",
             "starts_at": block_slot["starts_at"],
             "ends_at": block_slot["ends_at"],
-            "room_id": block_slot["room_id"],
-            "equipment_id": block_equipment["equipment_id"] if block_equipment else None,
-            "equipment_unit_number": block_equipment["unit_number"] if block_equipment else None,
+            "room_id": None,
+            "equipment_id": None,
+            "equipment_unit_number": None,
             "release_at": None,
             "reason": "Synthetic protected crown capacity validation",
         },
@@ -234,7 +266,7 @@ def main() -> int:
         "/api/recommendations",
         {
             "patient_name": "Synthetic Blocked Patient",
-            "medical_record_number": "SYNTHETIC-BLOCKED-001",
+            "medical_record_number": f"SYNTHETIC-BLOCKED-{run_key}",
             "procedure_code": "exam",
             "condition": "",
             "date_from": block_start.date().isoformat(),
@@ -256,7 +288,7 @@ def main() -> int:
         "/api/recommendations",
         {
             "patient_name": "Synthetic Override Patient",
-            "medical_record_number": "SYNTHETIC-OVERRIDE-001",
+            "medical_record_number": f"SYNTHETIC-OVERRIDE-{run_key}",
             "procedure_code": "exam",
             "condition": "",
             "date_from": block_start.date().isoformat(),
@@ -267,11 +299,13 @@ def main() -> int:
             "allow_reserved_block_override": True,
         },
     )
-    override_slot = next(
+    override_candidates = [
         item for item in override_search["candidates"]
         if item["doctor_id"] == block_slot["doctor_id"]
         and item["requires_reserved_block_override"]
-    )
+    ]
+    assert override_candidates, json.dumps(override_search, indent=2)
+    override_slot = override_candidates[0]
     client.expect_error(
         "POST",
         "/api/appointments",
@@ -303,7 +337,7 @@ def main() -> int:
         "/api/recommendations",
         {
             "patient_name": "Synthetic Validation Patient",
-            "medical_record_number": "SYNTHETIC-E2E-001",
+            "medical_record_number": f"SYNTHETIC-E2E-{run_key}",
             "procedure_code": "exam",
             "condition": "Routine checkup with mild cold sensitivity",
             "date_from": (today + timedelta(days=1)).isoformat(),
@@ -322,10 +356,10 @@ def main() -> int:
     patient_search = client.request(
         "POST",
         "/api/patients/search",
-        {"query": "SYNTHETIC-E2E-001", "limit": 10},
+        {"query": f"SYNTHETIC-E2E-{run_key}", "limit": 10},
     )
     assert any(
-        item["medical_record_number"] == "SYNTHETIC-E2E-001"
+        item["medical_record_number"] == f"SYNTHETIC-E2E-{run_key}"
         for item in patient_search["patients"]
     ), "expected the progressive scheduler's patient lookup to find the existing record"
     client.expect_error(
@@ -389,7 +423,7 @@ def main() -> int:
         "/api/waitlist",
         {
             "patient_name": "Synthetic Waitlist Patient",
-            "medical_record_number": "SYNTHETIC-E2E-WAITLIST-001",
+            "medical_record_number": f"SYNTHETIC-E2E-WAITLIST-{run_key}",
             "procedure_code": "cleaning",
             "earliest_date": (today + timedelta(days=1)).isoformat(),
             "latest_date": (today + timedelta(days=60)).isoformat(),
@@ -448,7 +482,7 @@ def main() -> int:
         "/api/recommendations",
         {
             "patient_name": "Synthetic Crown Patient",
-            "medical_record_number": "SYNTHETIC-E2E-CROWN-001",
+            "medical_record_number": f"SYNTHETIC-E2E-CROWN-{run_key}",
             "procedure_code": "crown",
             "condition": "",
             "date_from": (today + timedelta(days=1)).isoformat(),
@@ -503,7 +537,7 @@ def main() -> int:
         "/api/recommendations",
         {
             "patient_name": "Synthetic Walk In",
-            "medical_record_number": "SYNTHETIC-E2E-WALKIN-001",
+            "medical_record_number": f"SYNTHETIC-E2E-WALKIN-{run_key}",
             "procedure_code": "emergency",
             "condition": "Urgent pain walk in",
             "date_from": today.isoformat(),

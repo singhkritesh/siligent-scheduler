@@ -194,7 +194,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--green-2); box-sh
 .simulation-invariant span { color: var(--muted); }
 
 .workflow-shell { max-width: 980px; margin: 0 auto; }
-.workflow-progress { display: grid; grid-template-columns: repeat(4,1fr); margin-bottom: 1rem; border: 1px solid var(--line); border-radius: 12px; background: white; overflow: hidden; }
+.workflow-progress { display: grid; grid-template-columns: repeat(3,1fr); margin-bottom: 1rem; border: 1px solid var(--line); border-radius: 12px; background: white; overflow: hidden; }
 .workflow-step { min-height: 68px; display: flex; align-items: center; justify-content: center; gap: .55rem; border: 0; border-right: 1px solid var(--line); background: white; color: var(--muted); }
 .workflow-step:last-child { border-right: 0; }
 .workflow-step span { width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid var(--line-strong); border-radius: 50%; font-size: .76rem; }
@@ -402,7 +402,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--green-2); box-sh
   .user-chip > span:last-child { display: none; }
   .hero-card { display: block; }
   .quick-actions { justify-content: flex-start; margin-top: 1rem; }
-  .workflow-progress { grid-template-columns: repeat(4, minmax(70px,1fr)); overflow-x: auto; }
+  .workflow-progress { grid-template-columns: repeat(3, minmax(90px,1fr)); overflow-x: auto; }
   .workflow-step { display: grid; gap: .2rem; min-height: 72px; padding: .4rem; }
   .workflow-step strong { font-size: .7rem; }
   .settings-layout { grid-template-columns: 1fr; }

@@ -134,7 +134,9 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn("window.setTimeout(() => URL.revokeObjectURL(url), 1000)", self.javascript)
 
     def test_scheduling_is_progressive_and_requires_review(self) -> None:
-        self.assertEqual(self.html.count('data-schedule-step="'), 4)
+        self.assertEqual(self.html.count('data-schedule-step="'), 3)
+        self.assertIn('id="patient-always-available"', self.html)
+        self.assertIn('patient_always_available: $("#patient-always-available").checked', self.javascript)
         self.assertIn('id="patient-search"', self.html)
         self.assertIn('api("/api/patients/search"', self.javascript)
         self.assertNotIn("/api/patients?q=", self.javascript)
@@ -158,6 +160,7 @@ class FrontendContractTests(unittest.TestCase):
         for element_id in (
             "configuration-reserved-blocks",
             "reserved-block-form",
+            "reserved-block-repeat-until",
             "reserved-block-override-search",
             "reserved-block-override-review",
             "reserved-block-override-reason",
@@ -169,6 +172,7 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn("requires_reserved_block_override", self.javascript)
         self.assertIn("reserved_block_override_acknowledged", self.javascript)
         self.assertIn("/api/configuration/reserved-blocks", self.javascript)
+        self.assertIn("repeat_weekly_until", self.javascript)
 
     def test_vacancy_recovery_is_localized_and_permission_gated(self) -> None:
         for element_id in (

@@ -69,7 +69,8 @@ rewrites appointments that were not explicitly selected.
 - Doctor qualification for the procedure on the exact candidate date
 - Dentist, hygienist, and assistant working hours, leave, and closures
 - Ordered procedure phases with standard or complex duration
-- Patient availability and approved deadline
+- Patient availability and approved deadline when the basic any-opening
+  assumption is explicitly disabled
 - Required room and equipment availability
 - No overlap for the patient, room, provider phase, or exclusive equipment
 - Configurable maximum simultaneous supervised visits per dentist
@@ -85,10 +86,15 @@ The optimizer must not return a recommendation that violates a hard constraint.
 The API and database recheck dentist supervision and numbered equipment-unit
 capacity transactionally so concurrent confirmations cannot exceed policy.
 
-## Reserved procedure blocks
+## Doctor procedure blocks
 
 An authorized configuration user may protect future capacity for one doctor,
-one procedure, and an exact timezone-aware interval. A block may also bind an
+one procedure, and an exact timezone-aware interval. A block may be created once
+or expanded into exact weekly occurrences through a selected date. Each
+occurrence is a separate immutable, audited record. The entire series is rejected
+atomically if any occurrence falls outside the doctor’s working hours,
+qualification dates, rolling horizon, overlaps leave or a practice closure, or
+conflicts with protected capacity. A block may also bind an
 eligible room and a required numbered equipment unit. Block creation is rejected
 when it overlaps a held or confirmed appointment; it never reslots an existing
 appointment.
@@ -138,6 +144,12 @@ the current calendar. Existing confirmed appointments remain fixed. The system
 does not need to rebuild or rewrite the entire annual schedule for each arrival.
 Cancellation recovery follows the same incremental principle: one exact vacancy
 and one authorized later visit are evaluated per step.
+
+The basic request assumes the patient can accept any feasible opening in the
+rolling horizon. This removes unnecessary patient-window entry while preserving
+provider, procedure-block, room, equipment, closure, leave, and lock constraints.
+When a patient supplies real limits, staff disables the assumption and records
+the explicit date and daily-time window.
 
 ## No-feasible-slot behavior
 
