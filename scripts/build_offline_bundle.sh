@@ -76,7 +76,7 @@ fi
 
 # shellcheck disable=SC1091
 source "$ROOT_DIR/.env" 2>/dev/null || source "$ROOT_DIR/.env.example"
-images=("${DATABASE_IMAGE:-postgres:16-alpine}" "${API_IMAGE:-siligent-scheduler-api:local}")
+images=("${DATABASE_IMAGE:-postgres@sha256:20edbde7749f822887a1a022ad526fde0a47d6b2be9a8364433605cf65099416}" "${API_IMAGE:-siligent-scheduler-api:local}")
 expected_arch="${PLATFORM#linux/}"
 for image in "${images[@]}"; do
   docker image inspect "$image" >/dev/null 2>&1 || siligent_fail "Required image is missing: $image"

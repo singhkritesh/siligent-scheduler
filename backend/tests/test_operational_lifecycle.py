@@ -353,6 +353,21 @@ class OperationalLifecycleTests(unittest.TestCase):
         self.assertIn("APPROVED_LOCAL_MODEL_OLLAMA_ID", setup)
         self.assertIn("APPROVED_API_BASE_REFERENCE", build)
 
+    def test_database_image_fallbacks_remain_pinned(self) -> None:
+        pinned_reference = (
+            "postgres@sha256:20edbde7749f822887a1a022ad526fde0a47d6b2be9a8364433605cf65099416"
+        )
+        for relative in (
+            "install.sh",
+            "setup.sh",
+            "start.sh",
+            "verify.sh",
+            "scripts/build_offline_bundle.sh",
+        ):
+            content = self.read(relative)
+            self.assertIn(pinned_reference, content, relative)
+            self.assertNotIn("postgres:16-alpine", content, relative)
+
     def test_desktop_launcher_is_health_aware_and_does_not_log_phi(self) -> None:
         launcher = self.read("scripts/launch_ui.sh")
         installer = self.read("scripts/install_desktop_launcher.sh")

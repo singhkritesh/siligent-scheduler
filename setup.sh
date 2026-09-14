@@ -267,7 +267,7 @@ check_images() {
   local phase="${1:-preflight}"
   local image
   local missing=()
-  for image in "${DATABASE_IMAGE:-postgres:16-alpine}"; do
+  for image in "${DATABASE_IMAGE:-postgres@sha256:20edbde7749f822887a1a022ad526fde0a47d6b2be9a8364433605cf65099416}"; do
     docker image inspect "$image" >/dev/null 2>&1 || missing+=("$image")
   done
   if [[ "$phase" == "final" || "$BUILD_IMAGE" == "false" ]]; then
@@ -282,7 +282,7 @@ check_images() {
     printf '  - %s\n' "${missing[@]}" >&2
     fail "Import and verify the approved offline release bundle; setup will not download missing artifacts."
   fi
-  check_image_architecture "${DATABASE_IMAGE:-postgres:16-alpine}"
+  check_image_architecture "${DATABASE_IMAGE:-postgres@sha256:20edbde7749f822887a1a022ad526fde0a47d6b2be9a8364433605cf65099416}"
   if [[ "$phase" == "final" || "$BUILD_IMAGE" == "false" ]]; then
     check_image_architecture "${API_IMAGE:-siligent-scheduler-api:local}"
   else

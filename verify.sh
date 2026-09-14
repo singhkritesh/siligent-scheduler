@@ -28,7 +28,7 @@ set +a
 for service in database api; do
   running_image_id="$(siligent_compose images -q "$service")"
   [[ -n "$running_image_id" ]] || siligent_fail "No running image is associated with $service."
-  if [[ "$service" == "database" ]]; then configured_image="${DATABASE_IMAGE:-postgres:16-alpine}";
+  if [[ "$service" == "database" ]]; then configured_image="${DATABASE_IMAGE:-postgres@sha256:20edbde7749f822887a1a022ad526fde0a47d6b2be9a8364433605cf65099416}";
   else configured_image="${API_IMAGE:-siligent-scheduler-api:local}"; fi
   configured_image_id="$(docker image inspect "$configured_image" --format '{{.Id}}')"
   [[ "${running_image_id#sha256:}" == "${configured_image_id#sha256:}" ]] \

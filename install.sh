@@ -208,7 +208,7 @@ fi
   if command -v ollama >/dev/null 2>&1; then printf 'ollama_version=%s\n' "$(ollama --version 2>/dev/null | awk 'END {print $NF}')"; fi
   if command -v ollama.exe >/dev/null 2>&1; then printf 'ollama_version=%s\n' "$(ollama.exe --version 2>/dev/null | awk 'END {print $NF}')"; fi
   docker image inspect siligent-scheduler-api:local --format 'api_image_id={{.Id}}'
-  docker image inspect "${DATABASE_IMAGE:-postgres:16-alpine}" --format 'database_image_id={{.Id}}'
+  docker image inspect "${DATABASE_IMAGE:-postgres@sha256:20edbde7749f822887a1a022ad526fde0a47d6b2be9a8364433605cf65099416}" --format 'database_image_id={{.Id}}'
   if docker image inspect "$PYTHON_BASE_IMAGE" >/dev/null 2>&1; then
     docker image inspect "$PYTHON_BASE_IMAGE" --format 'connected_base_image_id={{.Id}}'
   fi
