@@ -6,6 +6,16 @@ LAUNCHER_PATH="$ROOT_DIR/scripts/launch_ui.sh"
 
 [[ $# -eq 0 ]] || { printf '[launcher-install][error] This installer accepts no options.\n' >&2; exit 1; }
 
+require_directory_or_absent() {
+  local directory
+  for directory in "$@"; do
+    if [[ -e "$directory" && ! -d "$directory" ]]; then
+      printf '[launcher-install][error] Expected a directory but found a file: %s\n' "$directory" >&2
+      exit 1
+    fi
+  done
+}
+
 install_macos_launcher() {
   local desktop_dir="$HOME/Desktop"
   local applications_dir="$HOME/Applications"
@@ -14,6 +24,7 @@ install_macos_launcher() {
   local source_file existing_source="" apple_path
   command -v osacompile >/dev/null 2>&1 \
     || { printf '[launcher-install][error] osacompile is required on macOS.\n' >&2; exit 1; }
+  require_directory_or_absent "$desktop_dir" "$applications_dir" "$ROOT_DIR/.runtime"
   mkdir -p "$desktop_dir" "$applications_dir" "$ROOT_DIR/.runtime"
   if [[ -d "$app_dir" && -f "$app_dir/Contents/Resources/Scripts/main.scpt" ]]; then
     existing_source="$(osadecompile "$app_dir/Contents/Resources/Scripts/main.scpt" 2>/dev/null || true)"
@@ -58,6 +69,7 @@ install_linux_launcher() {
   local wrapper="$wrapper_dir/launch"
   local application_file="$applications_dir/siligent-scheduler.desktop"
   local desktop_file="$desktop_dir/Siligent Scheduler.desktop"
+  require_directory_or_absent "$desktop_dir" "$applications_dir" "$wrapper_dir"
   mkdir -p "$desktop_dir" "$applications_dir" "$wrapper_dir"
   {
     printf '#!/usr/bin/env bash\n'

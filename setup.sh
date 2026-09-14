@@ -113,7 +113,7 @@ check_repository() {
   for required in \
     AGENTS.md CLAUDE.md MEMORY.md README.md PRODUCTION_READINESS.md \
     .env.example docker-compose.yml install.sh setup.sh build.sh start.sh stop.sh \
-    verify.sh backup.sh restore.sh uninstall.sh VERSION requirements.runtime.lock \
+    verify.sh backup.sh restore.sh uninstall.sh purge.sh VERSION requirements.runtime.lock \
     deploy/OFFLINE_ARTIFACTS.env deploy/windows/install-scheduler-shortcut.ps1 \
     deploy/windows/uninstall-scheduler-shortcut.ps1 \
     scripts/initialize-local-config.sh \
@@ -131,7 +131,7 @@ check_repository() {
   bash -n \
     "$ROOT_DIR/install.sh" "$ROOT_DIR/setup.sh" "$ROOT_DIR/build.sh" "$ROOT_DIR/start.sh" \
     "$ROOT_DIR/stop.sh" "$ROOT_DIR/verify.sh" "$ROOT_DIR/backup.sh" \
-    "$ROOT_DIR/restore.sh" "$ROOT_DIR/uninstall.sh" \
+    "$ROOT_DIR/restore.sh" "$ROOT_DIR/uninstall.sh" "$ROOT_DIR/purge.sh" \
     "$ROOT_DIR/scripts/initialize-local-config.sh" \
     "$ROOT_DIR/scripts/healthcheck.sh" \
     "$ROOT_DIR/scripts/install_desktop_launcher.sh" \

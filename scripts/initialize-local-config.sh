@@ -46,6 +46,10 @@ else
   fi
 fi
 
+if [[ -e "$CERT_DIR" && ! -d "$CERT_DIR" ]]; then
+  printf '[setup][error] %s exists but is not a directory. Rename that file, then rerun setup; no application or database data was changed.\n' "$CERT_DIR" >&2
+  exit 1
+fi
 mkdir -p "$CERT_DIR"
 if [[ ! -f "$CERT_DIR/server.crt" || ! -f "$CERT_DIR/server.key" ]]; then
   openssl req -x509 -newkey rsa:3072 -sha256 -nodes -days 30 \

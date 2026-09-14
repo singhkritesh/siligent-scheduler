@@ -306,6 +306,9 @@ class OperationalLifecycleTests(unittest.TestCase):
         self.assertIn('if mkdir "$LOCK_DIR" 2>/dev/null; then', launcher)
         self.assertIn('Treat that as an in-progress launch', launcher)
         self.assertIn("Siligent Scheduler", installer)
+        self.assertIn("require_directory_or_absent", installer)
+        initializer = self.read("scripts/initialize-local-config.sh")
+        self.assertIn("exists but is not a directory", initializer)
         for prohibited in ("patient", "condition_summary", "POSTGRES_PASSWORD"):
             self.assertNotIn(prohibited, launcher)
 
@@ -471,6 +474,29 @@ class OperationalLifecycleTests(unittest.TestCase):
             self.assertEqual(upgraded.count("FUTURE_COMPAT_KEY=enabled"), 1)
             self.assertTrue((root / "certs" / "server.crt").is_file())
             self.assertTrue((root / "certs" / "server.key").is_file())
+
+    def test_local_configuration_explains_a_conflicting_certificate_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            scripts = root / "scripts"
+            scripts.mkdir()
+            shutil.copy2(ROOT / ".env.example", root / ".env.example")
+            shutil.copy2(
+                ROOT / "scripts" / "initialize-local-config.sh",
+                scripts / "initialize-local-config.sh",
+            )
+            (scripts / "initialize-local-config.sh").chmod(0o755)
+            (root / "certs").write_text("not a directory", encoding="utf-8")
+
+            result = subprocess.run(
+                [str(scripts / "initialize-local-config.sh")],
+                cwd=root,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("exists but is not a directory", result.stderr)
 
 
 if __name__ == "__main__":
