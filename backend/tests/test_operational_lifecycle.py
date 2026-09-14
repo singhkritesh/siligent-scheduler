@@ -20,6 +20,26 @@ class OperationalLifecycleTests(unittest.TestCase):
         self.assertEqual(self.read("AGENTS.md"), self.read("CLAUDE.md"))
         self.assertIn("Read `MEMORY.md`", self.read("AGENTS.md"))
 
+    def test_runtime_directory_recovers_from_a_conflicting_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            runtime_path = Path(temporary_directory) / ".runtime"
+            runtime_path.write_text("stale launcher state", encoding="utf-8")
+            result = subprocess.run(
+                [
+                    "bash",
+                    "-c",
+                    'source "$1"; SILIGENT_COMPONENT=test; siligent_ensure_runtime_directory "$2"; test -d "$2"',
+                    "bash",
+                    str(ROOT / "scripts/lib/common.sh"),
+                    str(runtime_path),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(runtime_path.is_dir())
+
     def test_shell_entry_points_use_strict_mode_and_parse(self) -> None:
         scripts = [
             "install.sh",
@@ -267,7 +287,7 @@ class OperationalLifecycleTests(unittest.TestCase):
         self.assertIn("product-owned", purge)
         self.assertIn("siligent-scheduler-api", purge)
         self.assertIn("uninstall_desktop_launcher.sh", purge)
-        self.assertIn('rm -f "$ROOT_DIR/certs"', purge)
+        self.assertIn('rm -rf -- "$ROOT_DIR/.env" "$ROOT_DIR/certs"', purge)
         self.assertNotIn("system prune", purge)
 
     def test_purge_removes_a_conflicting_certificate_file_when_requested(self) -> None:
@@ -288,7 +308,8 @@ class OperationalLifecycleTests(unittest.TestCase):
             )
             (root / "purge.sh").chmod(0o755)
             (scripts / "uninstall_desktop_launcher.sh").chmod(0o755)
-            (root / ".env").write_text("API_IMAGE=siligent-scheduler-api:local\n", encoding="utf-8")
+            (root / ".env").mkdir()
+            (root / ".env" / "conflicting-file").write_text("conflicting path", encoding="utf-8")
             (root / "certs").write_text("conflicting file", encoding="utf-8")
             docker = fake_bin / "docker"
             docker.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")

@@ -5,8 +5,11 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUNTIME_DIR="$ROOT_DIR/.runtime"
 LOG_FILE="$RUNTIME_DIR/desktop-launcher.log"
 LOCK_DIR="$RUNTIME_DIR/desktop-launcher.lock"
+# shellcheck disable=SC1091
+source "$ROOT_DIR/scripts/lib/common.sh"
+SILIGENT_COMPONENT="launcher"
 
-mkdir -p "$RUNTIME_DIR"
+siligent_ensure_runtime_directory "$RUNTIME_DIR"
 export PATH="/opt/homebrew/bin:/usr/local/bin:/Applications/Docker.app/Contents/Resources/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 
 HOST_OS="$(uname -s)"

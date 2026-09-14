@@ -33,6 +33,18 @@ siligent_confirm() {
   [[ "$answer" == "y" || "$answer" == "Y" ]]
 }
 
+# Runtime state contains only product-generated lock files and operational logs.
+# It is safe to replace a conflicting regular file so a failed prior launch does
+# not prevent the supported lifecycle commands from recovering.
+siligent_ensure_runtime_directory() {
+  local directory="$1"
+  if [[ ( -e "$directory" || -L "$directory" ) && ! -d "$directory" ]]; then
+    siligent_warn "Removing conflicting product runtime file: $directory"
+    rm -f -- "$directory"
+  fi
+  mkdir -p -- "$directory"
+}
+
 siligent_compose() {
   local env_file="$SILIGENT_ROOT/.env"
   if [[ -f "$env_file" ]]; then

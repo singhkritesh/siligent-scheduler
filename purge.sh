@@ -72,14 +72,10 @@ fi
 rm -rf "$ROOT_DIR/.runtime"
 
 if [[ "$REMOVE_LOCAL_CONFIGURATION" == "true" ]]; then
-  siligent_info 'Removing local scheduler configuration and TLS certificate/key files...'
-  rm -f "$ROOT_DIR/.env"
-  if [[ -e "$ROOT_DIR/certs" && ! -d "$ROOT_DIR/certs" ]]; then
-    siligent_warn 'Removing a conflicting non-directory certificate path left by a failed installation.'
-    rm -f "$ROOT_DIR/certs"
-  elif [[ -d "$ROOT_DIR/certs" ]]; then
-    find "$ROOT_DIR/certs" -maxdepth 1 -type f \( -name '*.crt' -o -name '*.key' -o -name '*.pem' \) -delete
-  fi
+  siligent_info 'Removing local scheduler configuration and TLS certificate/key files, including conflicting paths...'
+  # This branch is reached only through an explicit destructive acknowledgement
+  # (or install.sh --fresh --yes). These paths are product-owned local config.
+  rm -rf -- "$ROOT_DIR/.env" "$ROOT_DIR/certs"
 fi
 
 if [[ "$REMOVE_BACKUPS" == "true" ]]; then

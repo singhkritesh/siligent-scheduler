@@ -10,6 +10,11 @@ command -v openssl >/dev/null 2>&1 || {
   exit 1
 }
 
+if [[ ( -e "$ENV_FILE" || -L "$ENV_FILE" ) && ! -f "$ENV_FILE" ]]; then
+  printf '[setup][error] %s exists but is not a configuration file. Re-run ./install.sh --fresh --yes only if replacing this local scheduler installation is approved.\n' "$ENV_FILE" >&2
+  exit 1
+fi
+
 if [[ ! -f "$ENV_FILE" ]]; then
   database_password="$(openssl rand -hex 32)"
   admin_password="$(openssl rand -base64 24 | tr -d '/+=' | cut -c1-24)"

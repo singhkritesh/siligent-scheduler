@@ -184,7 +184,7 @@ else
   fi
 fi
 
-mkdir -p "$ROOT_DIR/.runtime"
+siligent_ensure_runtime_directory "$ROOT_DIR/.runtime"
 if [[ -f "$ROOT_DIR/.env" ]]; then
   set -a
   # shellcheck disable=SC1091
