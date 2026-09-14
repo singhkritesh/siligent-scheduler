@@ -92,8 +92,29 @@ recoverability, host storage encryption, or complete HIPAA compliance.
 
 ## Administrative Workspace
 
-- Use **Settings > Team and access** for support providers and unique user
-  accounts.
+- Use **Settings > Team and access** to add dentists, support providers, and
+  unique user accounts. A dentist is a scheduling resource and may optionally
+  have a linked **Dentist / doctor** login account; do not use a shared account.
+- To deactivate a dentist, select **Deactivate** on the dentist record. Review
+  the displayed count of future locked appointments, protected procedure blocks,
+  and linked accounts. Existing appointments are never moved. Acknowledge that
+  each affected future appointment must be handled individually, and explicitly
+  choose whether to release protected blocks. Deactivation removes the dentist
+  from new searches, preserves all history, disables linked accounts and revokes
+  their active sessions. Reactivation does not restore released blocks or
+  reactivate an account automatically.
+- Never delete a staff record, appointment, or audit evidence to work around a
+  staffing change. Use the audited deactivate/reactivate action when history
+  exists.
+- **Permanent deletion** is available only for an inactive, unused dentist,
+  assistant, or hygienist. Select **Delete permanently** to review the dependency
+  summary and enter a reason. The action removes the staff record and its related
+  setup (hours, leave, shifts, qualifications, preferences, and targets) only
+  when there are no linked accounts, appointments, protected blocks,
+  recommendations, waitlist requests, duration observations, credits, or other
+  historical scheduling dependencies. The append-only audit trail is retained.
+  If deletion is blocked, keep the staff record inactive; do not use direct
+  database access to bypass the protection.
 - Use **Settings > Doctor blocks** for doctor procedure blocks, provider leave,
   daily overrides, and full-practice closures.
 - To protect procedure capacity, create a doctor procedure block with the dentist,

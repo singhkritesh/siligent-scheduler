@@ -174,6 +174,29 @@ class FrontendContractTests(unittest.TestCase):
         self.assertIn("/api/configuration/reserved-blocks", self.javascript)
         self.assertIn("repeat_weekly_until", self.javascript)
 
+    def test_dentist_and_account_lifecycle_controls_are_explicit(self) -> None:
+        for element_id in (
+            "configuration-doctors",
+            "doctor-form",
+            "doctor-procedure-options",
+            "doctor-status-dialog",
+            "doctor-future-acknowledgement",
+            "doctor-release-blocks",
+            "user-status-dialog",
+            "new-user-provider",
+            "provider-status-dialog",
+            "provider-delete-dialog",
+            "provider-delete-confirmation",
+        ):
+            self.assertIn(f'id="{element_id}"', self.html)
+        self.assertIn("Dentist / doctor", self.html)
+        self.assertIn("/api/configuration/doctors", self.javascript)
+        self.assertIn("/impact", self.javascript)
+        self.assertIn("future appointments remain locked", self.html)
+        self.assertIn("/api/configuration/users/${target.userId}/status", self.javascript)
+        self.assertIn("/deletion-impact", self.javascript)
+        self.assertIn("Delete permanently", self.javascript)
+
     def test_vacancy_recovery_is_localized_and_permission_gated(self) -> None:
         for element_id in (
             "vacancy-recovery-dialog",

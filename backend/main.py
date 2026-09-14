@@ -144,6 +144,7 @@ class UserCreateBody(BaseModel):
     display_name: str = Field(min_length=2, max_length=160)
     role: str = Field(pattern="^(administrator|scheduler|clinician|auditor)$")
     password: str = Field(min_length=12, max_length=256)
+    provider_id: str | None = None
 
     @field_validator("username", "display_name", mode="before")
     @classmethod
@@ -155,6 +156,37 @@ class ProviderCreateBody(TrimmedBody):
     staff_code: str = Field(min_length=2, max_length=40)
     display_name: str = Field(min_length=2, max_length=160)
     role: str = Field(pattern="^(assistant|hygienist)$")
+
+
+class DoctorCreateBody(TrimmedBody):
+    staff_code: str = Field(min_length=2, max_length=40)
+    display_name: str = Field(min_length=2, max_length=160)
+    specialty: str = Field(min_length=2, max_length=120)
+    procedure_codes: list[str] = Field(min_length=1, max_length=200)
+    max_active_rooms: int = Field(default=3, ge=1, le=8)
+
+
+class DoctorStatusBody(TrimmedBody):
+    active: bool
+    reason: str = Field(min_length=10, max_length=500)
+    acknowledge_future_appointments: bool = False
+    release_active_blocks: bool = False
+
+
+class UserStatusBody(TrimmedBody):
+    active: bool
+    reason: str = Field(min_length=10, max_length=500)
+
+
+class ProviderStatusBody(TrimmedBody):
+    active: bool
+    reason: str = Field(min_length=10, max_length=500)
+    acknowledge_future_appointments: bool = False
+
+
+class PermanentDeleteBody(TrimmedBody):
+    reason: str = Field(min_length=10, max_length=500)
+    confirm_permanent_delete: bool = False
 
 
 class RoomCreateBody(TrimmedBody):
@@ -2587,7 +2619,7 @@ def configuration(user: dict = Depends(require_roles("administrator", "scheduler
         providers = connection.execute(
             """
             SELECT pv.id, pv.staff_code, pv.display_name, pv.role::text AS role, pv.active,
-                   pv.doctor_id, d.max_active_rooms
+                   pv.doctor_id, d.max_active_rooms, d.specialty, d.active AS doctor_active
               FROM providers pv LEFT JOIN doctors d ON d.id = pv.doctor_id
              ORDER BY pv.role, pv.display_name
             """
@@ -2605,7 +2637,13 @@ def configuration(user: dict = Depends(require_roles("administrator", "scheduler
             """
         ).fetchall()
         users = connection.execute(
-            "SELECT id, display_name, role::text AS role, active FROM app_users ORDER BY display_name"
+            """
+            SELECT u.id, u.display_name, u.role::text AS role, u.active, u.provider_id,
+                   p.display_name AS linked_dentist_name
+              FROM app_users u
+              LEFT JOIN providers p ON p.id = u.provider_id
+             ORDER BY u.display_name
+            """
         ).fetchall()
         procedures = connection.execute(
             """
@@ -2674,7 +2712,11 @@ def configuration(user: dict = Depends(require_roles("administrator", "scheduler
              "starts_at": row["starts_at"].isoformat(), "ends_at": row["ends_at"].isoformat()}
             for row in leave
         ],
-        "users": [{**row, "id": str(row["id"])} for row in users],
+        "users": [
+            {**row, "id": str(row["id"]),
+             "provider_id": str(row["provider_id"]) if row["provider_id"] else None}
+            for row in users
+        ],
         "procedures": [{**row, "id": str(row["id"])} for row in procedures],
         "phases": [{**row, "id": str(row["id"])} for row in phases],
         "preferences": [
@@ -2754,6 +2796,391 @@ def create_provider(
     except psycopg.errors.UniqueViolation as exc:
         raise HTTPException(status_code=409, detail="Provider staff code already exists") from exc
     return {"id": str(row["id"])}
+
+
+def _provider_deletion_impact(connection: psycopg.Connection, provider_id: str) -> dict:
+    provider = connection.execute(
+        """
+        SELECT pv.id, pv.role::text AS role, pv.active, pv.doctor_id, d.active AS doctor_active
+          FROM providers pv LEFT JOIN doctors d ON d.id = pv.doctor_id
+         WHERE pv.id = %s
+        """,
+        (provider_id,),
+    ).fetchone()
+    if not provider:
+        raise HTTPException(status_code=404, detail="Provider not found")
+
+    def count(sql: str, params: tuple = ()) -> int:
+        return int(connection.execute(sql, params).fetchone()["count"])
+
+    blocking = {
+        "linked_account_count": count("SELECT count(*) AS count FROM app_users WHERE provider_id = %s", (provider_id,)),
+        "appointment_phase_count": count("SELECT count(*) AS count FROM appointment_phases WHERE provider_id = %s", (provider_id,)),
+        "production_credit_count": count("SELECT count(*) AS count FROM appointment_production_credits WHERE provider_id = %s", (provider_id,)),
+    }
+    setup = {
+        "working_hours": count("SELECT count(*) AS count FROM provider_working_hours WHERE provider_id = %s", (provider_id,)),
+        "unavailability": count("SELECT count(*) AS count FROM provider_unavailability WHERE provider_id = %s", (provider_id,)),
+        "shift_overrides": count(
+            "SELECT count(*) AS count FROM provider_shift_overrides WHERE provider_id = %s OR covering_for_provider_id = %s",
+            (provider_id, provider_id),
+        ),
+        "preferences": count("SELECT count(*) AS count FROM provider_procedure_preferences WHERE provider_id = %s", (provider_id,)),
+        "daily_targets": count("SELECT count(*) AS count FROM provider_daily_targets WHERE provider_id = %s", (provider_id,)),
+    }
+    if provider["doctor_id"]:
+        doctor_id = provider["doctor_id"]
+        blocking.update({
+            "appointment_count": count("SELECT count(*) AS count FROM appointments WHERE doctor_id = %s", (doctor_id,)),
+            "recommendation_count": count("SELECT count(*) AS count FROM recommendation_snapshots WHERE doctor_id = %s", (doctor_id,)),
+            "waitlist_count": count("SELECT count(*) AS count FROM waitlist_entries WHERE preferred_doctor_id = %s", (doctor_id,)),
+            "protected_block_count": count("SELECT count(*) AS count FROM reserved_procedure_blocks WHERE doctor_id = %s", (doctor_id,)),
+            "block_override_count": count("SELECT count(*) AS count FROM reserved_block_override_permissions WHERE doctor_id = %s", (doctor_id,)),
+            "duration_observation_count": count("SELECT count(*) AS count FROM procedure_duration_observations WHERE doctor_id = %s", (doctor_id,)),
+            "reschedule_permission_count": count(
+                "SELECT count(*) AS count FROM reschedule_permissions WHERE old_doctor_id = %s OR new_doctor_id = %s",
+                (doctor_id, doctor_id),
+            ),
+            "vacancy_recovery_count": count(
+                """
+                SELECT count(*) AS count FROM vacancy_recovery_chains
+                 WHERE current_doctor_id = %s
+                """,
+                (doctor_id,),
+            ),
+        })
+        setup.update({
+            "qualifications": count("SELECT count(*) AS count FROM doctor_procedure_qualifications WHERE doctor_id = %s", (doctor_id,)),
+            "doctor_working_hours": count("SELECT count(*) AS count FROM doctor_working_hours WHERE doctor_id = %s", (doctor_id,)),
+            "doctor_unavailability": count("SELECT count(*) AS count FROM doctor_unavailability WHERE doctor_id = %s", (doctor_id,)),
+        })
+    return {
+        "provider_id": str(provider["id"]),
+        "doctor_id": str(provider["doctor_id"]) if provider["doctor_id"] else None,
+        "role": provider["role"],
+        "active": bool(provider["active"]),
+        "doctor_active": bool(provider["doctor_active"]) if provider["doctor_id"] else None,
+        "blocking": blocking,
+        "setup": setup,
+        "blocking_total": sum(blocking.values()),
+        "setup_total": sum(setup.values()),
+    }
+
+
+@app.get("/api/configuration/providers/{provider_id}/deletion-impact")
+def provider_deletion_impact(
+    provider_id: str,
+    user: dict = Depends(require_roles("administrator")),
+):
+    with connect() as connection:
+        return _provider_deletion_impact(connection, provider_id)
+
+
+@app.put("/api/configuration/providers/{provider_id}/status")
+def update_support_provider_status(
+    provider_id: str,
+    body: ProviderStatusBody,
+    user: dict = Depends(require_roles("administrator")),
+):
+    with transaction() as connection:
+        provider = connection.execute(
+            "SELECT id, role::text AS role, active FROM providers WHERE id = %s FOR UPDATE",
+            (provider_id,),
+        ).fetchone()
+        if not provider:
+            raise HTTPException(status_code=404, detail="Provider not found")
+        if provider["role"] == "doctor":
+            raise HTTPException(status_code=422, detail="Use the dentist lifecycle workflow for a dentist")
+        if provider["active"] == body.active:
+            return {"provider_id": provider_id, "active": body.active, "changed": False}
+        future_appointments = connection.execute(
+            """
+            SELECT count(*) AS count
+              FROM appointment_phases ph JOIN appointments a ON a.id = ph.appointment_id
+             WHERE ph.provider_id = %s AND ph.active AND a.status IN ('held', 'confirmed')
+               AND ph.ends_at > transaction_timestamp()
+            """,
+            (provider_id,),
+        ).fetchone()["count"]
+        if not body.active and future_appointments and not body.acknowledge_future_appointments:
+            raise HTTPException(
+                status_code=409,
+                detail="Acknowledge that existing future appointments remain locked before deactivating this provider",
+            )
+        connection.execute("UPDATE providers SET active = %s WHERE id = %s", (body.active, provider_id))
+        append_audit(
+            connection, actor_id=user["id"],
+            event_type="provider.reactivated" if body.active else "provider.deactivated",
+            entity_type="provider", entity_id=provider_id, correlation_id=str(uuid.uuid4()),
+            details={"reason_recorded": True, "future_appointments_preserved": future_appointments},
+        )
+    return {"provider_id": provider_id, "active": body.active, "changed": True}
+
+
+@app.delete("/api/configuration/providers/{provider_id}")
+def permanently_delete_provider(
+    provider_id: str,
+    body: PermanentDeleteBody,
+    user: dict = Depends(require_roles("administrator")),
+):
+    if not body.confirm_permanent_delete:
+        raise HTTPException(status_code=422, detail="Explicit permanent-deletion acknowledgement is required")
+    try:
+        with transaction() as connection:
+            impact = _provider_deletion_impact(connection, provider_id)
+            if impact["active"] or impact["doctor_active"] is True:
+                raise HTTPException(status_code=409, detail="Deactivate the staff member before permanent deletion")
+            if impact["blocking_total"]:
+                raise HTTPException(
+                    status_code=409,
+                    detail="This staff member has appointment, account, protected-capacity, or historical scheduling dependencies and cannot be permanently deleted",
+                )
+            connection.execute(
+                "DELETE FROM provider_shift_overrides WHERE provider_id = %s OR covering_for_provider_id = %s",
+                (provider_id, provider_id),
+            )
+            connection.execute("DELETE FROM provider_unavailability WHERE provider_id = %s", (provider_id,))
+            connection.execute("DELETE FROM provider_working_hours WHERE provider_id = %s", (provider_id,))
+            if impact["doctor_id"]:
+                doctor_id = impact["doctor_id"]
+                connection.execute("DELETE FROM doctor_procedure_qualifications WHERE doctor_id = %s", (doctor_id,))
+                connection.execute("DELETE FROM doctor_unavailability WHERE doctor_id = %s", (doctor_id,))
+                connection.execute("DELETE FROM doctor_working_hours WHERE doctor_id = %s", (doctor_id,))
+            connection.execute("DELETE FROM providers WHERE id = %s", (provider_id,))
+            if impact["doctor_id"]:
+                connection.execute("DELETE FROM doctors WHERE id = %s", (impact["doctor_id"],))
+            append_audit(
+                connection, actor_id=user["id"], event_type="provider.permanently_deleted",
+                entity_type="provider", entity_id=provider_id, correlation_id=str(uuid.uuid4()),
+                details={
+                    "role": impact["role"],
+                    "related_setup_deleted": impact["setup_total"],
+                    "reason_recorded": True,
+                },
+            )
+    except psycopg.errors.ForeignKeyViolation as exc:
+        raise HTTPException(
+            status_code=409,
+            detail="This staff member has protected historical dependencies and cannot be permanently deleted",
+        ) from exc
+    return {"provider_id": provider_id, "permanently_deleted": True}
+
+
+@app.post("/api/configuration/doctors", status_code=201)
+def create_doctor(
+    body: DoctorCreateBody,
+    user: dict = Depends(require_roles("administrator")),
+):
+    procedure_codes = sorted({item.strip().upper() for item in body.procedure_codes if item.strip()})
+    if not procedure_codes:
+        raise HTTPException(status_code=422, detail="Select at least one approved procedure")
+    try:
+        with transaction() as connection:
+            procedures = connection.execute(
+                "SELECT id, code FROM procedures WHERE active AND upper(code) = ANY(%s)",
+                (procedure_codes,),
+            ).fetchall()
+            if len(procedures) != len(procedure_codes):
+                raise HTTPException(status_code=422, detail="One or more selected procedures are inactive or unknown")
+            doctor = connection.execute(
+                """
+                INSERT INTO doctors (staff_code, display_name, specialty, max_active_rooms)
+                VALUES (%s, %s, %s, %s) RETURNING id
+                """,
+                (body.staff_code.upper(), body.display_name, body.specialty, body.max_active_rooms),
+            ).fetchone()
+            provider = connection.execute(
+                """
+                INSERT INTO providers (staff_code, display_name, role, doctor_id)
+                VALUES (%s, %s, 'doctor', %s) RETURNING id
+                """,
+                (body.staff_code.upper(), body.display_name, doctor["id"]),
+            ).fetchone()
+            for weekday in range(5):
+                connection.execute(
+                    """
+                    INSERT INTO doctor_working_hours (
+                        doctor_id, weekday, local_start, local_end, effective_from
+                    ) VALUES (%s, %s, '08:00', '17:00', CURRENT_DATE)
+                    """,
+                    (doctor["id"], weekday),
+                )
+                connection.execute(
+                    """
+                    INSERT INTO provider_working_hours (
+                        provider_id, weekday, local_start, local_end, effective_from
+                    ) VALUES (%s, %s, '08:00', '17:00', CURRENT_DATE)
+                    """,
+                    (provider["id"], weekday),
+                )
+            for procedure in procedures:
+                connection.execute(
+                    """
+                    INSERT INTO doctor_procedure_qualifications (
+                        doctor_id, procedure_id, effective_from, approved_by
+                    ) VALUES (%s, %s, CURRENT_DATE, %s)
+                    """,
+                    (doctor["id"], procedure["id"], user["id"]),
+                )
+            append_audit(
+                connection, actor_id=user["id"], event_type="doctor.created",
+                entity_type="doctor", entity_id=str(doctor["id"]), correlation_id=str(uuid.uuid4()),
+                details={"qualification_count": len(procedures), "default_hours_created": True},
+            )
+    except psycopg.errors.UniqueViolation as exc:
+        raise HTTPException(status_code=409, detail="Dentist staff code already exists") from exc
+    return {"id": str(doctor["id"]), "provider_id": str(provider["id"])}
+
+
+@app.get("/api/configuration/doctors/{doctor_id}/impact")
+def doctor_status_impact(
+    doctor_id: str,
+    user: dict = Depends(require_roles("administrator")),
+):
+    with connect() as connection:
+        doctor = connection.execute(
+            """
+            SELECT d.id, d.active, pv.active AS provider_active, pv.id AS provider_id
+              FROM doctors d JOIN providers pv ON pv.doctor_id = d.id
+             WHERE d.id = %s AND pv.role = 'doctor'
+            """,
+            (doctor_id,),
+        ).fetchone()
+        if not doctor:
+            raise HTTPException(status_code=404, detail="Dentist not found")
+        future_appointments = connection.execute(
+            """
+            SELECT count(*) AS count FROM appointments
+             WHERE doctor_id = %s AND status IN ('held', 'confirmed')
+               AND ends_at > transaction_timestamp()
+            """,
+            (doctor_id,),
+        ).fetchone()["count"]
+        active_blocks = connection.execute(
+            """
+            SELECT count(*) AS count FROM reserved_procedure_blocks
+             WHERE doctor_id = %s AND status = 'active'
+               AND upper(reserved_during) > transaction_timestamp()
+            """,
+            (doctor_id,),
+        ).fetchone()["count"]
+        linked_accounts = connection.execute(
+            "SELECT count(*) AS count FROM app_users WHERE provider_id = %s AND active",
+            (doctor["provider_id"],),
+        ).fetchone()["count"]
+    return {
+        "doctor_id": doctor_id,
+        "active": bool(doctor["active"] and doctor["provider_active"]),
+        "future_appointment_count": future_appointments,
+        "active_block_count": active_blocks,
+        "active_linked_account_count": linked_accounts,
+    }
+
+
+@app.put("/api/configuration/doctors/{doctor_id}/status")
+def update_doctor_status(
+    doctor_id: str,
+    body: DoctorStatusBody,
+    user: dict = Depends(require_roles("administrator")),
+):
+    correlation_id = str(uuid.uuid4())
+    with transaction() as connection:
+        doctor = connection.execute(
+            """
+            SELECT d.id, d.active, pv.active AS provider_active, pv.id AS provider_id
+              FROM doctors d JOIN providers pv ON pv.doctor_id = d.id
+             WHERE d.id = %s AND pv.role = 'doctor' FOR UPDATE OF d, pv
+            """,
+            (doctor_id,),
+        ).fetchone()
+        if not doctor:
+            raise HTTPException(status_code=404, detail="Dentist not found")
+        if doctor["active"] == body.active and doctor["provider_active"] == body.active:
+            return {"doctor_id": doctor_id, "active": body.active, "changed": False}
+
+        future_appointments = connection.execute(
+            """
+            SELECT count(*) AS count FROM appointments
+             WHERE doctor_id = %s AND status IN ('held', 'confirmed')
+               AND ends_at > transaction_timestamp()
+            """,
+            (doctor_id,),
+        ).fetchone()["count"]
+        blocks = connection.execute(
+            """
+            SELECT id FROM reserved_procedure_blocks
+             WHERE doctor_id = %s AND status = 'active'
+               AND upper(reserved_during) > transaction_timestamp()
+             FOR UPDATE
+            """,
+            (doctor_id,),
+        ).fetchall()
+        if not body.active and future_appointments and not body.acknowledge_future_appointments:
+            raise HTTPException(
+                status_code=409,
+                detail="Acknowledge that existing future appointments remain locked before deactivating this dentist",
+            )
+        if not body.active and blocks and not body.release_active_blocks:
+            raise HTTPException(
+                status_code=409,
+                detail="Choose whether to release the dentist's active protected blocks before deactivating",
+            )
+
+        released_block_count = 0
+        if not body.active and body.release_active_blocks:
+            for block in blocks:
+                connection.execute(
+                    "SELECT set_config('siligent.reserved_block_change_id', %s, true)",
+                    (str(block["id"]),),
+                )
+                connection.execute(
+                    """
+                    UPDATE reserved_procedure_blocks
+                       SET status = 'released', released_by = %s,
+                           released_at = transaction_timestamp(), release_reason = %s
+                     WHERE id = %s
+                    """,
+                    (user["id"], body.reason, block["id"]),
+                )
+                append_audit(
+                    connection, actor_id=user["id"], event_type="reserved_block.released",
+                    entity_type="reserved_procedure_block", entity_id=str(block["id"]),
+                    correlation_id=correlation_id,
+                    details={"reason_recorded": True, "source": "dentist_deactivation"},
+                )
+                released_block_count += 1
+
+        connection.execute(
+            "UPDATE doctors SET active = %s, updated_at = transaction_timestamp() WHERE id = %s",
+            (body.active, doctor_id),
+        )
+        connection.execute("UPDATE providers SET active = %s WHERE id = %s", (body.active, doctor["provider_id"]))
+        disabled_accounts = 0
+        if not body.active:
+            disabled_accounts = connection.execute(
+                "UPDATE app_users SET active = false, updated_at = transaction_timestamp() WHERE provider_id = %s AND active",
+                (doctor["provider_id"],),
+            ).rowcount
+            connection.execute(
+                """
+                UPDATE user_sessions SET revoked_at = transaction_timestamp()
+                 WHERE user_id IN (SELECT id FROM app_users WHERE provider_id = %s)
+                   AND revoked_at IS NULL
+                """,
+                (doctor["provider_id"],),
+            )
+        append_audit(
+            connection, actor_id=user["id"],
+            event_type="doctor.reactivated" if body.active else "doctor.deactivated",
+            entity_type="doctor", entity_id=doctor_id, correlation_id=correlation_id,
+            details={
+                "reason_recorded": True,
+                "future_appointments_preserved": future_appointments,
+                "released_block_count": released_block_count,
+                "disabled_linked_account_count": disabled_accounts,
+            },
+        )
+    return {"doctor_id": doctor_id, "active": body.active, "changed": True}
 
 
 @app.post("/api/configuration/rooms", status_code=201)
@@ -3072,12 +3499,27 @@ def create_user(
     salt, password_hash = create_password(body.password)
     try:
         with transaction() as connection:
+            if body.provider_id:
+                provider = connection.execute(
+                    """
+                    SELECT pv.id, d.active AS doctor_active
+                      FROM providers pv JOIN doctors d ON d.id = pv.doctor_id
+                     WHERE pv.id = %s AND pv.role = 'doctor'
+                    """,
+                    (body.provider_id,),
+                ).fetchone()
+                if not provider:
+                    raise HTTPException(status_code=422, detail="Linked dentist was not found")
+                if body.role != "clinician":
+                    raise HTTPException(status_code=422, detail="A linked dentist account must use the Dentist / doctor role")
+                if not provider["doctor_active"]:
+                    raise HTTPException(status_code=422, detail="Reactivate the dentist before creating a linked account")
             row = connection.execute(
                 """
-                INSERT INTO app_users (external_subject, display_name, role)
-                VALUES (%s, %s, %s) RETURNING id
+                INSERT INTO app_users (external_subject, display_name, role, provider_id)
+                VALUES (%s, %s, %s, %s) RETURNING id
                 """,
-                (f"local:{body.username.lower()}", body.display_name.strip(), body.role),
+                (f"local:{body.username.lower()}", body.display_name.strip(), body.role, body.provider_id),
             ).fetchone()
             connection.execute(
                 """
@@ -3089,11 +3531,54 @@ def create_user(
             append_audit(
                 connection, actor_id=user["id"], event_type="user.created",
                 entity_type="user", entity_id=str(row["id"]), correlation_id=str(uuid.uuid4()),
-                details={"role": body.role},
+                details={"role": body.role, "linked_dentist": bool(body.provider_id)},
             )
     except psycopg.errors.UniqueViolation as exc:
         raise HTTPException(status_code=409, detail="Username already exists") from exc
     return {"id": str(row["id"]), "role": body.role}
+
+
+@app.put("/api/configuration/users/{target_user_id}/status")
+def update_user_status(
+    target_user_id: str,
+    body: UserStatusBody,
+    user: dict = Depends(require_roles("administrator")),
+):
+    if target_user_id == user["id"] and not body.active:
+        raise HTTPException(status_code=422, detail="You cannot deactivate your own account")
+    with transaction() as connection:
+        target = connection.execute(
+            """
+            SELECT u.id, u.active, u.provider_id, d.active AS linked_dentist_active
+              FROM app_users u
+              LEFT JOIN providers pv ON pv.id = u.provider_id
+              LEFT JOIN doctors d ON d.id = pv.doctor_id
+             WHERE u.id = %s FOR UPDATE OF u
+            """,
+            (target_user_id,),
+        ).fetchone()
+        if not target:
+            raise HTTPException(status_code=404, detail="Practice user not found")
+        if target["active"] == body.active:
+            return {"user_id": target_user_id, "active": body.active, "changed": False}
+        if body.active and target["provider_id"] and not target["linked_dentist_active"]:
+            raise HTTPException(status_code=409, detail="Reactivate the linked dentist before activating this account")
+        connection.execute(
+            "UPDATE app_users SET active = %s, updated_at = transaction_timestamp() WHERE id = %s",
+            (body.active, target_user_id),
+        )
+        if not body.active:
+            connection.execute(
+                "UPDATE user_sessions SET revoked_at = transaction_timestamp() WHERE user_id = %s AND revoked_at IS NULL",
+                (target_user_id,),
+            )
+        append_audit(
+            connection, actor_id=user["id"],
+            event_type="user.reactivated" if body.active else "user.deactivated",
+            entity_type="user", entity_id=target_user_id, correlation_id=str(uuid.uuid4()),
+            details={"reason_recorded": True},
+        )
+    return {"user_id": target_user_id, "active": body.active, "changed": True}
 
 
 @app.get("/api/analytics")

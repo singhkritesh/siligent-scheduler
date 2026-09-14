@@ -223,6 +223,10 @@ input:focus, select:focus, textarea:focus { border-color: var(--green-2); box-sh
 .check-field { display: flex; align-items: center; gap: .65rem; min-height: 46px; padding: .65rem .75rem; border: 1px solid var(--line); border-radius: 9px; background: #fafbf8; }
 .check-field input { width: auto; min-height: auto; }
 .check-field small { display: block; margin-top: .2rem; }
+.checklist-fieldset { margin: 0; padding: .75rem; border: 1px solid var(--line); border-radius: 9px; }
+.checklist-fieldset legend { padding: 0 .25rem; font-weight: 700; }
+.checklist-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: .45rem; margin-top: .65rem; }
+.checklist-options .check-field { min-height: 40px; padding: .45rem .55rem; }
 .warning-check { border-color: #ddc79c; background: var(--warning); }
 .phase-preview { display: flex; flex-wrap: wrap; gap: .45rem; }
 .phase-chip { padding: .4rem .55rem; border-radius: 7px; background: #edf4f0; color: #47615d; font-size: .76rem; }

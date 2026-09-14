@@ -25,6 +25,10 @@ const state = {
   contactWaitlistId: null,
   calibrationProcedureCode: null,
   releaseReservedBlockId: null,
+  doctorStatusTarget: null,
+  providerStatusTarget: null,
+  providerDeletionTarget: null,
+  userStatusTarget: null,
   calendarMode: "month",
   calendarMonthOffset: 0,
   simulationFile: null,
@@ -1096,15 +1100,17 @@ async function loadConfiguration() {
   ]);
   state.configuration = data;
   state.reservedBlocks = reserved.blocks;
-  $("#configuration-providers").innerHTML = data.providers.map((item) => `<article class="resource-item"><span><strong>${escapeHtml(item.display_name)}</strong><small>${escapeHtml(item.staff_code)} · ${escapeHtml(item.role)}${item.max_active_rooms ? ` · max ${escapeHtml(item.max_active_rooms)} active rooms` : ""}</small></span><span class="badge">${item.active ? "active" : "inactive"}</span></article>`).join("");
+  const doctors = data.providers.filter((item) => item.role === "doctor");
+  $("#configuration-doctors").innerHTML = doctors.map((item) => `<article class="resource-item"><span><strong>${escapeHtml(item.display_name)}</strong><small>${escapeHtml(item.staff_code)} · ${escapeHtml(item.specialty || "Dentist")} · max ${escapeHtml(item.max_active_rooms)} active rooms</small></span><span class="row-actions"><span class="badge">${item.active && item.doctor_active ? "active" : "inactive"}</span><button class="button quiet doctor-status-trigger" data-id="${escapeHtml(item.doctor_id)}" type="button">${item.active && item.doctor_active ? "Deactivate" : "Reactivate"}</button><button class="button quiet provider-delete-trigger" data-id="${escapeHtml(item.id)}" type="button">Delete permanently</button></span></article>`).join("") || '<div class="empty-state compact"><p>No dentists configured.</p></div>';
+  $("#configuration-providers").innerHTML = data.providers.filter((item) => item.role !== "doctor").map((item) => `<article class="resource-item"><span><strong>${escapeHtml(item.display_name)}</strong><small>${escapeHtml(item.staff_code)} · ${escapeHtml(item.role)}</small></span><span class="row-actions"><span class="badge">${item.active ? "active" : "inactive"}</span><button class="button quiet provider-status-trigger" data-id="${escapeHtml(item.id)}" type="button">${item.active ? "Deactivate" : "Reactivate"}</button><button class="button quiet provider-delete-trigger" data-id="${escapeHtml(item.id)}" type="button">Delete permanently</button></span></article>`).join("") || '<div class="empty-state compact"><p>No support providers configured.</p></div>';
   $("#configuration-rooms").innerHTML = data.rooms.map((item) => `<article class="resource-item"><span><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.code)} · ${escapeHtml(item.category)} · ${escapeHtml(item.turnover_minutes)}m turnover</small></span><span class="badge">${item.active ? "active" : "inactive"}</span></article>`).join("");
   $("#configuration-leave").innerHTML = data.unavailability.map((item) => `<article class="resource-item"><span><strong>${escapeHtml(item.display_name)}</strong><small>${escapeHtml(formatDateTime(item.starts_at))}–${escapeHtml(formatDateTime(item.ends_at))} · ${escapeHtml(item.reason_code.replaceAll("_", " "))}</small></span></article>`).join("") || '<div class="empty-state compact"><p>No upcoming leave recorded.</p></div>';
-  $("#configuration-users").innerHTML = data.users.map((item) => `<article class="resource-item"><span><strong>${escapeHtml(item.display_name)}</strong><small>${escapeHtml(item.role)}</small></span><span class="badge">${item.active ? "active" : "inactive"}</span></article>`).join("");
+  $("#configuration-users").innerHTML = data.users.map((item) => `<article class="resource-item"><span><strong>${escapeHtml(item.display_name)}</strong><small>${escapeHtml(item.role === "clinician" ? "Dentist / doctor" : item.role)}${item.linked_dentist_name ? ` · linked to ${escapeHtml(item.linked_dentist_name)}` : ""}</small></span><span class="row-actions"><span class="badge">${item.active ? "active" : "inactive"}</span>${item.id === state.user?.id ? "" : `<button class="button quiet user-status-trigger" data-id="${escapeHtml(item.id)}" type="button">${item.active ? "Deactivate" : "Reactivate"}</button>`}</span></article>`).join("");
+  $("#doctor-procedure-options").innerHTML = data.procedures.filter((item) => item.active).map((item) => `<label class="check-field"><input class="doctor-procedure-code" type="checkbox" value="${escapeHtml(item.code)}"><span>${escapeHtml(item.name)}</span></label>`).join("");
   const providerOptions = data.providers.filter((item) => item.active).map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.display_name)} · ${escapeHtml(item.role)}</option>`).join("");
   $("#leave-provider").innerHTML = providerOptions;
   $("#shift-provider").innerHTML = providerOptions;
   $("#shift-cover-for").innerHTML = '<option value="">Not coverage</option>' + providerOptions;
-  const doctors = data.providers.filter((item) => item.doctor_id);
   $("#capacity-doctor").innerHTML = doctors.map((item) => `<option value="${escapeHtml(item.doctor_id)}" data-capacity="${escapeHtml(item.max_active_rooms)}">${escapeHtml(item.display_name)}</option>`).join("");
   $("#preference-provider").innerHTML = doctors.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.display_name)}</option>`).join("");
   const procedureOptions = data.procedures.map((item) => `<option value="${escapeHtml(item.code)}">${escapeHtml(item.name)}</option>`).join("");
@@ -1118,6 +1124,12 @@ async function loadConfiguration() {
   $("#reserved-block-procedure").innerHTML = procedureOptions;
   $("#reserved-block-room").innerHTML = '<option value="">No room reserved</option>' + data.rooms.filter((item) => item.active).map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}</option>`).join("");
   $("#reserved-block-equipment").innerHTML = '<option value="">No equipment reserved</option>' + data.equipment.filter((item) => item.active).flatMap((item) => Array.from({ length: item.quantity }, (_, index) => `<option value="${escapeHtml(item.id)}:${index + 1}">${escapeHtml(item.name)} · unit ${index + 1}</option>`)).join("");
+  $("#new-user-provider").innerHTML = '<option value="">No linked dentist</option>' + doctors.filter((item) => item.active && item.doctor_active).map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.display_name)}</option>`).join("");
+  updateUserProviderVisibility();
+  $("#configuration-doctors").querySelectorAll(".doctor-status-trigger").forEach((button) => button.addEventListener("click", () => openDoctorStatus(button.dataset.id)));
+  $("#configuration-providers").querySelectorAll(".provider-status-trigger").forEach((button) => button.addEventListener("click", () => openProviderStatus(button.dataset.id)));
+  $$(".provider-delete-trigger").forEach((button) => button.addEventListener("click", () => openProviderDeletion(button.dataset.id)));
+  $("#configuration-users").querySelectorAll(".user-status-trigger").forEach((button) => button.addEventListener("click", () => openUserStatus(button.dataset.id)));
   renderReservedBlocks();
   $("#configuration-closures").innerHTML = data.closures.map((item) => `<article class="resource-item"><span><strong>${escapeHtml(item.reason_code.replaceAll("_", " "))}</strong><small>${escapeHtml(formatDateTime(item.starts_at))}–${escapeHtml(formatDateTime(item.ends_at))}</small></span></article>`).join("") || '<div class="empty-state compact"><p>No upcoming closures.</p></div>';
   renderProcedurePolicy();
@@ -1222,9 +1234,232 @@ async function runSettingsMutation(event, request, title, detail) {
 }
 
 function addProvider(event) { return runSettingsMutation(event, () => api("/api/configuration/providers", { method: "POST", body: JSON.stringify({ staff_code: $("#provider-code").value, display_name: $("#provider-name").value, role: $("#provider-role").value }) }), "Provider added", "The provider is available to future scheduling searches according to configured hours."); }
+function addDoctor(event) {
+  const procedureCodes = $$(".doctor-procedure-code:checked").map((input) => input.value);
+  if (!procedureCodes.length) {
+    event.preventDefault();
+    toast("Select at least one clinician-approved procedure.", true);
+    return null;
+  }
+  return runSettingsMutation(event, () => api("/api/configuration/doctors", { method: "POST", body: JSON.stringify({
+    staff_code: $("#doctor-code").value,
+    display_name: $("#doctor-name").value,
+    specialty: $("#doctor-specialty").value,
+    max_active_rooms: Number($("#doctor-capacity").value),
+    procedure_codes: procedureCodes,
+  }) }), "Dentist added", "The dentist is active with approved qualifications and default weekday hours. Review availability before scheduling.");
+}
+
+function updateDoctorStatusApproval() {
+  const target = state.doctorStatusTarget;
+  if (!target) return;
+  const futureApproved = target.nextActive || !target.impact.future_appointment_count || $("#doctor-future-acknowledgement").checked;
+  const blocksApproved = target.nextActive || !target.impact.active_block_count || $("#doctor-release-blocks").checked;
+  $("#apply-doctor-status-button").disabled = !(futureApproved && blocksApproved);
+}
+
+async function openDoctorStatus(doctorId) {
+  const provider = state.configuration.providers.find((item) => item.doctor_id === doctorId);
+  if (!provider) return;
+  try {
+    const impact = await api(`/api/configuration/doctors/${doctorId}/impact`);
+    const nextActive = !(provider.active && provider.doctor_active);
+    state.doctorStatusTarget = { doctorId, provider, impact, nextActive };
+    $("#doctor-status-title").textContent = `${nextActive ? "Reactivate" : "Deactivate"} dentist`;
+    $("#doctor-status-summary").textContent = `${provider.display_name} · ${provider.staff_code}`;
+    $("#doctor-status-impact").innerHTML = nextActive
+      ? "<strong>Reactivation effect</strong><span>The dentist returns to future scheduling searches. Prior blocks are not recreated and linked accounts remain inactive until separately reactivated.</span>"
+      : `<strong>Impact review</strong><span>${escapeHtml(impact.future_appointment_count)} future locked appointment(s) remain unchanged · ${escapeHtml(impact.active_block_count)} protected block(s) require release · ${escapeHtml(impact.active_linked_account_count)} linked active account(s) will be disabled.</span>`;
+    $("#doctor-future-ack-row").hidden = nextActive || !impact.future_appointment_count;
+    $("#doctor-release-blocks-row").hidden = nextActive || !impact.active_block_count;
+    $("#doctor-future-acknowledgement").checked = false;
+    $("#doctor-release-blocks").checked = false;
+    $("#doctor-status-reason").value = "";
+    const button = $("#apply-doctor-status-button");
+    button.textContent = `${nextActive ? "Reactivate" : "Deactivate"} dentist`;
+    button.className = `button ${nextActive ? "primary" : "danger"}`;
+    updateDoctorStatusApproval();
+    $("#doctor-status-dialog").showModal();
+  } catch (error) {
+    toast(error.message, true);
+  }
+}
+
+async function applyDoctorStatus(event) {
+  event.preventDefault();
+  const target = state.doctorStatusTarget;
+  if (!target) return;
+  const button = event.submitter;
+  loading(button, true);
+  try {
+    await api(`/api/configuration/doctors/${target.doctorId}/status`, { method: "PUT", body: JSON.stringify({
+      active: target.nextActive,
+      reason: $("#doctor-status-reason").value,
+      acknowledge_future_appointments: $("#doctor-future-acknowledgement").checked,
+      release_active_blocks: $("#doctor-release-blocks").checked,
+    }) });
+    $("#doctor-status-dialog").close();
+    success(`Dentist ${target.nextActive ? "reactivated" : "deactivated"}`, target.nextActive ? "The dentist can appear in future searches. Linked accounts must be reactivated separately." : "New searches exclude the dentist. Existing appointments remain locked and unchanged.");
+    state.calendarLoaded = false;
+    await loadConfiguration();
+  } catch (error) {
+    toast(error.message, true);
+  } finally {
+    loading(button, false);
+  }
+}
+
+function updateProviderStatusApproval() {
+  const target = state.providerStatusTarget;
+  if (!target) return;
+  $("#apply-provider-status-button").disabled = !(
+    target.nextActive || !target.impact.blocking.appointment_phase_count || $("#provider-future-acknowledgement").checked
+  );
+}
+
+async function openProviderStatus(providerId) {
+  const provider = state.configuration.providers.find((item) => item.id === providerId);
+  if (!provider) return;
+  try {
+    const impact = await api(`/api/configuration/providers/${providerId}/deletion-impact`);
+    const nextActive = !provider.active;
+    state.providerStatusTarget = { providerId, provider, impact, nextActive };
+    $("#provider-status-title").textContent = `${nextActive ? "Reactivate" : "Deactivate"} provider`;
+    $("#provider-status-summary").textContent = `${provider.display_name} · ${provider.role}`;
+    $("#provider-status-impact").innerHTML = nextActive
+      ? "<strong>Reactivation effect</strong><span>The provider returns to future scheduling searches.</span>"
+      : `<strong>Impact review</strong><span>${escapeHtml(impact.blocking.appointment_phase_count)} appointment phase record(s) are retained. Existing future appointments never move.</span>`;
+    $("#provider-future-ack-row").hidden = nextActive || !impact.blocking.appointment_phase_count;
+    $("#provider-future-acknowledgement").checked = false;
+    $("#provider-status-reason").value = "";
+    const button = $("#apply-provider-status-button");
+    button.textContent = `${nextActive ? "Reactivate" : "Deactivate"} provider`;
+    button.className = `button ${nextActive ? "primary" : "danger"}`;
+    updateProviderStatusApproval();
+    $("#provider-status-dialog").showModal();
+  } catch (error) {
+    toast(error.message, true);
+  }
+}
+
+async function applyProviderStatus(event) {
+  event.preventDefault();
+  const target = state.providerStatusTarget;
+  if (!target) return;
+  const button = event.submitter;
+  loading(button, true);
+  try {
+    await api(`/api/configuration/providers/${target.providerId}/status`, { method: "PUT", body: JSON.stringify({
+      active: target.nextActive,
+      reason: $("#provider-status-reason").value,
+      acknowledge_future_appointments: $("#provider-future-acknowledgement").checked,
+    }) });
+    $("#provider-status-dialog").close();
+    success(`Provider ${target.nextActive ? "reactivated" : "deactivated"}`, target.nextActive ? "The provider can appear in future searches." : "Existing appointments remain locked and unchanged.");
+    state.calendarLoaded = false;
+    await loadConfiguration();
+  } catch (error) {
+    toast(error.message, true);
+  } finally {
+    loading(button, false);
+  }
+}
+
+async function openProviderDeletion(providerId) {
+  const provider = state.configuration.providers.find((item) => item.id === providerId);
+  if (!provider) return;
+  try {
+    const impact = await api(`/api/configuration/providers/${providerId}/deletion-impact`);
+    state.providerDeletionTarget = { providerId, provider, impact };
+    $("#provider-delete-summary").textContent = `${provider.display_name} · ${provider.role}`;
+    const blockers = Object.entries(impact.blocking).filter(([, count]) => count).map(([key, count]) => `${count} ${key.replaceAll("_", " ")}`);
+    $("#provider-delete-impact").innerHTML = impact.blocking_total
+      ? `<strong>Deletion blocked</strong><span>${escapeHtml(blockers.join(" · "))}. Preserve this record as inactive.</span>`
+      : `<strong>Eligible after deactivation</strong><span>${escapeHtml(impact.setup_total)} related setup record(s) will be permanently deleted with this staff record.</span>`;
+    $("#provider-delete-reason").value = "";
+    $("#provider-delete-confirmation").checked = false;
+    updateProviderDeletionApproval();
+    $("#provider-delete-dialog").showModal();
+  } catch (error) {
+    toast(error.message, true);
+  }
+}
+
+function updateProviderDeletionApproval() {
+  const target = state.providerDeletionTarget;
+  if (!target) return;
+  $("#apply-provider-delete-button").disabled = Boolean(
+    target.impact.blocking_total || target.impact.active || target.impact.doctor_active || !$("#provider-delete-confirmation").checked
+  );
+}
+
+async function applyProviderDeletion(event) {
+  event.preventDefault();
+  const target = state.providerDeletionTarget;
+  if (!target) return;
+  if (!$("#provider-delete-confirmation").checked) {
+    toast("Confirm permanent deletion before continuing.", true);
+    return;
+  }
+  const button = event.submitter;
+  loading(button, true);
+  try {
+    await api(`/api/configuration/providers/${target.providerId}`, { method: "DELETE", body: JSON.stringify({
+      reason: $("#provider-delete-reason").value,
+      confirm_permanent_delete: true,
+    }) });
+    $("#provider-delete-dialog").close();
+    success("Staff record permanently deleted", "Eligible related configuration was removed. Audit history remains append-only.");
+    state.calendarLoaded = false;
+    await loadConfiguration();
+  } catch (error) {
+    toast(error.message, true);
+  } finally {
+    loading(button, false);
+  }
+}
+
+function updateUserProviderVisibility() {
+  const isDentist = $("#new-user-role").value === "clinician";
+  $("#new-user-dentist-row").hidden = !isDentist;
+  if (!isDentist) $("#new-user-provider").value = "";
+}
+
+function openUserStatus(userId) {
+  const account = state.configuration.users.find((item) => item.id === userId);
+  if (!account) return;
+  const nextActive = !account.active;
+  state.userStatusTarget = { userId, account, nextActive };
+  $("#user-status-title").textContent = `${nextActive ? "Reactivate" : "Deactivate"} account`;
+  $("#user-status-summary").textContent = `${account.display_name} · ${account.role === "clinician" ? "Dentist / doctor" : account.role}`;
+  $("#user-status-reason").value = "";
+  const button = $("#apply-user-status-button");
+  button.textContent = `${nextActive ? "Reactivate" : "Deactivate"} account`;
+  button.className = `button ${nextActive ? "primary" : "danger"}`;
+  $("#user-status-dialog").showModal();
+}
+
+async function applyUserStatus(event) {
+  event.preventDefault();
+  const target = state.userStatusTarget;
+  if (!target) return;
+  const button = event.submitter;
+  loading(button, true);
+  try {
+    await api(`/api/configuration/users/${target.userId}/status`, { method: "PUT", body: JSON.stringify({ active: target.nextActive, reason: $("#user-status-reason").value }) });
+    $("#user-status-dialog").close();
+    success(`Account ${target.nextActive ? "reactivated" : "deactivated"}`, target.nextActive ? "The user can sign in again." : "Active sessions were revoked and audit history was preserved.");
+    await loadConfiguration();
+  } catch (error) {
+    toast(error.message, true);
+  } finally {
+    loading(button, false);
+  }
+}
+
 function addRoom(event) { return runSettingsMutation(event, () => api("/api/configuration/rooms", { method: "POST", body: JSON.stringify({ code: $("#room-code").value, name: $("#room-name").value, category: $("#room-category").value, turnover_minutes: 10 }) }), "Operatory added", "Future searches can use this room where procedure policy permits."); }
 function addLeave(event) { return runSettingsMutation(event, () => api("/api/configuration/unavailability", { method: "POST", body: JSON.stringify({ provider_id: $("#leave-provider").value, starts_at: practiceLocalToIso($("#leave-start").value), ends_at: practiceLocalToIso($("#leave-end").value), reason_code: $("#leave-reason").value }) }), "Provider time blocked", "Future searches will respect this dated unavailability."); }
-function addUser(event) { return runSettingsMutation(event, () => api("/api/configuration/users", { method: "POST", body: JSON.stringify({ username: $("#new-username").value, display_name: $("#new-user-name").value, role: $("#new-user-role").value, password: $("#new-user-password").value }) }), "Unique account created", "The user can sign in with the assigned role and temporary password."); }
+function addUser(event) { return runSettingsMutation(event, () => api("/api/configuration/users", { method: "POST", body: JSON.stringify({ username: $("#new-username").value, display_name: $("#new-user-name").value, role: $("#new-user-role").value, password: $("#new-user-password").value, provider_id: $("#new-user-role").value === "clinician" ? ($("#new-user-provider").value || null) : null }) }), "Unique account created", "The user can sign in with the assigned role and temporary password."); }
 
 function renderProcedurePolicy() {
   const code = $("#policy-procedure").value || state.configuration.procedures[0]?.code;
@@ -1699,12 +1934,22 @@ function bindEvents() {
   $("#simulation-download-report").addEventListener("click", downloadSimulationReport);
 
   $$("[data-settings-route]").forEach((button) => button.addEventListener("click", () => setSettingsSection(button.dataset.settingsRoute)));
+  $("#doctor-form").addEventListener("submit", addDoctor);
   $("#provider-form").addEventListener("submit", addProvider);
   $("#room-form").addEventListener("submit", addRoom);
   $("#leave-form").addEventListener("submit", addLeave);
   $("#reserved-block-form").addEventListener("submit", createReservedBlock);
   $("#reserved-block-release-form").addEventListener("submit", releaseReservedBlock);
   $("#user-form").addEventListener("submit", addUser);
+  $("#new-user-role").addEventListener("change", updateUserProviderVisibility);
+  $("#doctor-status-form").addEventListener("submit", applyDoctorStatus);
+  $("#doctor-future-acknowledgement").addEventListener("change", updateDoctorStatusApproval);
+  $("#doctor-release-blocks").addEventListener("change", updateDoctorStatusApproval);
+  $("#user-status-form").addEventListener("submit", applyUserStatus);
+  $("#provider-status-form").addEventListener("submit", applyProviderStatus);
+  $("#provider-future-acknowledgement").addEventListener("change", updateProviderStatusApproval);
+  $("#provider-delete-form").addEventListener("submit", applyProviderDeletion);
+  $("#provider-delete-confirmation").addEventListener("change", updateProviderDeletionApproval);
   $("#capacity-form").addEventListener("submit", saveCapacity);
   $("#capacity-doctor").addEventListener("change", updateCapacityValue);
   $("#preference-form").addEventListener("submit", savePreference);

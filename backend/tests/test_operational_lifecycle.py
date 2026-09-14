@@ -395,6 +395,24 @@ class OperationalLifecycleTests(unittest.TestCase):
         self.assertIn("required_starts_at", recovery)
         self.assertIn("candidate.interval.start == required_starts_at", scheduling)
 
+    def test_dentist_and_account_lifecycle_preserve_history(self) -> None:
+        migration = self.read("database/migrations/0018_doctor_and_account_lifecycle.sql")
+        main = self.read("backend/main.py")
+
+        self.assertIn("ADD COLUMN provider_id", migration)
+        self.assertIn("enforce_dentist_user_link", migration)
+        self.assertIn('"/api/configuration/doctors/{doctor_id}/impact"', main)
+        self.assertIn('"/api/configuration/doctors/{doctor_id}/status"', main)
+        self.assertIn('"/api/configuration/users/{target_user_id}/status"', main)
+        self.assertIn('"/api/configuration/providers/{provider_id}/deletion-impact"', main)
+        self.assertIn('"/api/configuration/providers/{provider_id}"', main)
+        self.assertIn("permanently_deleted", main)
+        self.assertIn("Deactivate the staff member before permanent deletion", main)
+        self.assertIn("future appointments remain locked", main)
+        self.assertIn("released_block_count", main)
+        self.assertIn("doctor.deactivated", main)
+        self.assertIn("user.deactivated", main)
+
     def test_local_configuration_upgrade_is_idempotent(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

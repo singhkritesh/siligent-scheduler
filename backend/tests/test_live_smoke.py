@@ -179,6 +179,229 @@ def main() -> int:
     assert len([item for item in catalog["providers"] if item["role"] == "assistant"]) >= 4
     assert all(item["phases"] for item in catalog["procedures"])
 
+    for support_role in ("assistant", "hygienist"):
+        support_code = f"SYNTH-{support_role[:3].upper()}-{run_key[-10:]}"
+        support = client.request(
+            "POST",
+            "/api/configuration/providers",
+            {
+                "staff_code": support_code,
+                "display_name": f"Synthetic {support_role.title()} Delete",
+                "role": support_role,
+            },
+        )
+        support_impact = client.request(
+            "GET", f"/api/configuration/providers/{support['id']}/deletion-impact"
+        )
+        assert support_impact["blocking_total"] == 0 and support_impact["setup_total"] >= 5
+        client.expect_error(
+            "DELETE",
+            f"/api/configuration/providers/{support['id']}",
+            {"reason": "Synthetic permanent deletion validation", "confirm_permanent_delete": True},
+            409,
+        )
+        support_deactivated = client.request(
+            "PUT",
+            f"/api/configuration/providers/{support['id']}/status",
+            {"active": False, "reason": "Synthetic provider lifecycle validation"},
+        )
+        assert support_deactivated["active"] is False
+        support_deleted = client.request(
+            "DELETE",
+            f"/api/configuration/providers/{support['id']}",
+            {"reason": "Synthetic permanent deletion validation", "confirm_permanent_delete": True},
+        )
+        assert support_deleted["permanently_deleted"] is True
+
+    disposable_doctor = client.request(
+        "POST",
+        "/api/configuration/doctors",
+        {
+            "staff_code": f"SYNTH-DEL-{run_key[-10:]}",
+            "display_name": "Synthetic Dentist Delete",
+            "specialty": "General dentistry",
+            "procedure_codes": [catalog["procedures"][0]["code"]],
+            "max_active_rooms": 1,
+        },
+    )
+    client.request(
+        "PUT",
+        f"/api/configuration/doctors/{disposable_doctor['id']}/status",
+        {"active": False, "reason": "Synthetic dentist permanent deletion validation"},
+    )
+    disposable_deleted = client.request(
+        "DELETE",
+        f"/api/configuration/providers/{disposable_doctor['provider_id']}",
+        {"reason": "Synthetic dentist permanent deletion validation", "confirm_permanent_delete": True},
+    )
+    assert disposable_deleted["permanently_deleted"] is True
+
+    doctor_code = f"SYNTH-DOC-{run_key[-12:]}"
+    doctor = client.request(
+        "POST",
+        "/api/configuration/doctors",
+        {
+            "staff_code": doctor_code,
+            "display_name": "Synthetic Dentist Lifecycle",
+            "specialty": "General dentistry",
+            "procedure_codes": [catalog["procedures"][0]["code"]],
+            "max_active_rooms": 2,
+        },
+    )
+    created_configuration = client.request("GET", "/api/configuration")
+    created_dentist = next(
+        item for item in created_configuration["providers"] if item["doctor_id"] == doctor["id"]
+    )
+    dentist_username = f"synthetic-dentist-{run_key[-12:]}"
+    dentist_password = "Synthetic-Dentist-Only-123!"
+    dentist_account = client.request(
+        "POST",
+        "/api/configuration/users",
+        {
+            "username": dentist_username,
+            "display_name": "Synthetic Dentist Account",
+            "role": "clinician",
+            "provider_id": doctor["provider_id"],
+            "password": dentist_password,
+        },
+    )
+    assert created_dentist["active"] is True and created_dentist["doctor_active"] is True
+    lifecycle_search = client.request(
+        "POST",
+        "/api/recommendations",
+        {
+            "patient_name": "Synthetic Dentist Lifecycle Patient",
+            "medical_record_number": f"SYNTHETIC-DENTIST-{run_key}",
+            "procedure_code": catalog["procedures"][0]["code"],
+            "condition": "",
+            "date_from": (date.today() + timedelta(days=90)).isoformat(),
+            "date_to": (date.today() + timedelta(days=150)).isoformat(),
+            "time_from": "08:00:00",
+            "time_to": "17:00:00",
+            "preferred_doctor_id": doctor["id"],
+        },
+    )
+    lifecycle_candidates = [
+        item for item in lifecycle_search["candidates"] if item["doctor_id"] == doctor["id"]
+    ]
+    assert lifecycle_candidates, "expected a future synthetic appointment for the new dentist"
+    lifecycle_booking = client.request(
+        "POST",
+        "/api/appointments",
+        {"recommendation_id": lifecycle_candidates[0]["id"], "staff_confirms_intake": True},
+    )
+    assert lifecycle_booking["status"] == "confirmed" and lifecycle_booking["locked"] is True
+    lifecycle_block_search = client.request(
+        "POST",
+        "/api/recommendations",
+        {
+            "patient_name": "Synthetic Dentist Block Preview",
+            "medical_record_number": f"SYNTHETIC-DENTIST-BLOCK-{run_key}",
+            "procedure_code": catalog["procedures"][0]["code"],
+            "condition": "",
+            "date_from": (date.today() + timedelta(days=200)).isoformat(),
+            "date_to": (date.today() + timedelta(days=240)).isoformat(),
+            "time_from": "08:00:00",
+            "time_to": "17:00:00",
+            "preferred_doctor_id": doctor["id"],
+        },
+    )
+    lifecycle_block_candidates = [
+        item for item in lifecycle_block_search["candidates"] if item["doctor_id"] == doctor["id"]
+    ]
+    assert lifecycle_block_candidates, "expected a protected-block candidate for the new dentist"
+    lifecycle_block_slot = lifecycle_block_candidates[0]
+    lifecycle_block = client.request(
+        "POST",
+        "/api/configuration/reserved-blocks",
+        {
+            "doctor_id": doctor["id"],
+            "procedure_code": catalog["procedures"][0]["code"],
+            "starts_at": lifecycle_block_slot["starts_at"],
+            "ends_at": lifecycle_block_slot["ends_at"],
+            "room_id": None,
+            "equipment_id": None,
+            "equipment_unit_number": None,
+            "release_at": None,
+            "reason": "Synthetic dentist lifecycle protected block",
+        },
+    )
+    assert lifecycle_block["count"] == 1
+    impact = client.request("GET", f"/api/configuration/doctors/{doctor['id']}/impact")
+    assert impact["future_appointment_count"] >= 1 and impact["active_block_count"] == 1
+    client.expect_error(
+        "PUT",
+        f"/api/configuration/doctors/{doctor['id']}/status",
+        {"active": False, "reason": "Synthetic dentist lifecycle validation"},
+        409,
+    )
+    client.expect_error(
+        "PUT",
+        f"/api/configuration/doctors/{doctor['id']}/status",
+        {
+            "active": False,
+            "reason": "Synthetic dentist lifecycle validation",
+            "acknowledge_future_appointments": True,
+        },
+        409,
+    )
+    deactivated = client.request(
+        "PUT",
+        f"/api/configuration/doctors/{doctor['id']}/status",
+        {
+            "active": False,
+            "reason": "Synthetic dentist lifecycle validation",
+            "acknowledge_future_appointments": True,
+            "release_active_blocks": True,
+        },
+    )
+    assert deactivated["active"] is False and deactivated["changed"] is True
+    client.expect_error(
+        "DELETE",
+        f"/api/configuration/providers/{doctor['provider_id']}",
+        {"reason": "Synthetic protected history deletion validation", "confirm_permanent_delete": True},
+        409,
+    )
+    released_blocks = client.request("GET", "/api/reserved-blocks")
+    assert any(
+        item["id"] == lifecycle_block["ids"][0] and item["status"] == "released"
+        for item in released_blocks["blocks"]
+    ), "deactivation must release only explicitly approved protected blocks"
+    preserved = client.request(
+        "GET",
+        f"/api/appointments?date_from={(date.today() + timedelta(days=90)).isoformat()}&date_to={(date.today() + timedelta(days=150)).isoformat()}",
+    )
+    assert any(
+        item["id"] == lifecycle_booking["appointment_id"] and item["status"] == "confirmed"
+        for item in preserved["appointments"]
+    ), "deactivation must preserve the confirmed appointment"
+    dentist_client = Client(client.base_url)
+    dentist_client.expect_error(
+        "POST", "/api/auth/login", {"username": dentist_username, "password": dentist_password}, 401
+    )
+    client.expect_error(
+        "PUT",
+        f"/api/configuration/users/{dentist_account['id']}/status",
+        {"active": True, "reason": "Synthetic account activation should require dentist activation"},
+        409,
+    )
+    reactivated = client.request(
+        "PUT",
+        f"/api/configuration/doctors/{doctor['id']}/status",
+        {"active": True, "reason": "Synthetic dentist lifecycle reactivation"},
+    )
+    assert reactivated["active"] is True
+    account_reactivated = client.request(
+        "PUT",
+        f"/api/configuration/users/{dentist_account['id']}/status",
+        {"active": True, "reason": "Synthetic linked account lifecycle reactivation"},
+    )
+    assert account_reactivated["active"] is True
+    dentist_login = dentist_client.request(
+        "POST", "/api/auth/login", {"username": dentist_username, "password": dentist_password}
+    )
+    assert dentist_login["user"]["role"] == "clinician"
+
     today = date.today()
     any_opening = client.request(
         "POST",
@@ -630,6 +853,12 @@ def main() -> int:
     assert "appointment.confirmed" in event_types
     assert "appointment.rescheduled" in event_types
     assert "appointment.cancelled" in event_types
+    assert "doctor.created" in event_types
+    assert "doctor.deactivated" in event_types
+    assert "doctor.reactivated" in event_types
+    assert "user.deactivated" in event_types
+    assert "user.reactivated" in event_types
+    assert "provider.permanently_deleted" in event_types
     if completed_walk_in:
         assert "appointment.completed" in event_types
     assert "waitlist.created" in event_types

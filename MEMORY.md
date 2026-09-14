@@ -230,3 +230,47 @@ backup, restoration, access review, and periodic evaluation.
 Do not place patient names, conditions, appointment details, access tokens,
 database contents, or raw prompts in logs, fixtures, screenshots, release
 bundles, or repository files.
+
+## Isolated Simulation Data Preparation Product
+
+- `simulation-data-prep/` is a separate, loopback-only preparation product. It
+  has no scheduler API, credentials, database mount, or shared Docker network.
+- Raw uploads, parsed source tables, OCR/document text, decoded visual pages,
+  and transient identity maps are memory/tmpfs-only and are destroyed before
+  review persistence, including on model failure. Upload parsing and local-model
+  extraction run outside the web request loop in one bounded worker. The UI
+  receives and polls only a random, owner-scoped processing ID, remains
+  responsive during long inference, and clears its original file selection as
+  soon as the worker accepts it.
+- Only masked review workspaces persist, as AES-256-GCM authenticated payloads
+  in an app-only SQLite volume with a separately mounted local key.
+- Every uploaded file receives a generated `SRC-###` reference. The product
+  retains privacy-safe cross-file provenance for all sources, including
+  zero-result files, multi-file procedure/doctor links, eligibility, rates,
+  phases, requests, availability, and procedure blocks. Original filenames are
+  never retained.
+- Local Ollama is optional for structured CSV/XLSX input. PDFs, uploaded images,
+  and supported DOCX images are sent as pixels to a selected model that reports
+  local `vision` capability, alongside masked OCR. Because pixels can visibly
+  contain identifiers, a separately managed host-native Ollama process is
+  inside the sensitive-data boundary. It binds to a dedicated loopback port,
+  runs with cloud/history/request logging disabled, receives no database or
+  source-folder mount, and is stopped independently of the user's normal
+  Ollama service. The parser container's output firewall permits only this
+  endpoint; host model output is reduced to allowlisted timestamped error codes
+  before persistence, with raw output and request content discarded. Production
+  host-firewall egress denial remains required.
+- Multimodal extraction is table-first: native tables, flat-cell visual
+  transcription, and deterministic labeled OCR feed one ephemeral table layer.
+  Known headers use local aliases; only unknown headers receive local-model
+  semantic classification through opaque `H###` identifiers.
+- Final roles and joins are deterministic. Procedure IDs connect rates, phases,
+  appointments, eligibility, and blocks. Doctor names are normalized only in
+  transient memory, replaced by `DR-*`, and used to assign an appointment only
+  when procedure/date/time overlap identifies one unambiguous doctor block.
+- The reviewed export includes `source_mapping.json`. Only the masked package
+  is transferred manually to the scheduler.
+- **Delete all uploaded data** removes every encrypted masked workspace and
+  resets the current review. `stop.sh` preserves masked workspaces while
+  destroying transient state; `purge.sh --yes` removes the masked-data volume
+  and encryption key but preserves installed local models.
