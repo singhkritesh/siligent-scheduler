@@ -344,6 +344,12 @@ class OperationalLifecycleTests(unittest.TestCase):
         self.assertIn("Convert-ToGitBashPath", common)
         self.assertIn("Remove-NetFirewallRule", policy)
         self.assertIn("verify_no_egress.sh", policy)
+        shortcut_install = self.read("deploy/windows/install-scheduler-shortcut.ps1")
+        self.assertIn("[string]$WslRoot", shortcut_install)
+        self.assertIn("test -f $WslLauncher", shortcut_install)
+        self.assertIn("exec ./scripts/launch_ui.sh", shortcut_install)
+        launcher_install = self.read("scripts/install_desktop_launcher.sh")
+        self.assertIn('-WslRoot "$ROOT_DIR"', launcher_install)
         shortcut_uninstall = self.read("deploy/windows/uninstall-scheduler-shortcut.ps1")
         self.assertIn("Refusing to remove an unrecognized shortcut", shortcut_uninstall)
 

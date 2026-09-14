@@ -100,7 +100,7 @@ install_windows_launcher() {
       || { printf '[launcher-install][error] WSL_DISTRO_NAME is unavailable.\n' >&2; exit 1; }
     launcher_windows="$(wslpath -w "$LAUNCHER_PATH")"
     powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(wslpath -w "$powershell_script")" \
-      -Launcher "$launcher_windows" -WslDistribution "$WSL_DISTRO_NAME" -WslLauncher "$LAUNCHER_PATH"
+      -Launcher "$launcher_windows" -WslDistribution "$WSL_DISTRO_NAME" -WslLauncher "$LAUNCHER_PATH" -WslRoot "$ROOT_DIR"
   else
     command -v cygpath >/dev/null 2>&1 \
       || { printf '[launcher-install][error] cygpath is required from Git Bash.\n' >&2; exit 1; }

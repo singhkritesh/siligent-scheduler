@@ -133,7 +133,9 @@ Controlled local rebuild from preloaded artifacts:
 - `install.sh --fresh --yes` is the only installation mode that invokes the
   guarded purge automatically. It removes the prior scheduler database, local
   configuration, certificates, backups, launcher, and product API images before
-  continuing through the normal supported install/setup workflow. Default
+  continuing through the normal supported install/setup workflow. It also
+  removes conflicts at product-owned `.runtime`, `.env`, and `certs` paths
+  before generating clean local runtime and configuration files. Default
   installation remains an idempotent, data-preserving upgrade.
 - Existing installations receive a pre-upgrade PostgreSQL backup, and the prior
   API image is retained under a timestamped rollback tag before change.

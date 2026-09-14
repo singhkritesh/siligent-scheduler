@@ -79,8 +79,10 @@ use `--no-launcher` only on a managed server without a desktop session.
 To deliberately replace an existing local scheduler installation with a new,
 empty one, use the explicit fresh-install mode. It removes this scheduler's
 database volume, local configuration, certificates, backups, launcher, and
-product API images before running the normal install/setup workflow. It never
-runs implicitly during an update:
+product API images before running the normal install/setup workflow. It also
+removes a conflicting product-owned `.runtime`, `.env`, or `certs` path before
+recreating clean local configuration. It never runs implicitly during an
+update:
 
 ```bash
 ./install.sh --fresh --yes --connected --without-llm

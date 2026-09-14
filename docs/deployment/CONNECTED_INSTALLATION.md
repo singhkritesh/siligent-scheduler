@@ -65,3 +65,18 @@ A detected existing installation is backed up before image replacement. The
 previous API image is retained with a timestamped rollback tag. Configuration
 upgrades append new defaults without replacing local values. After migration,
 the complete runtime verification gate must pass before staff access resumes.
+
+## Approved replacement installation
+
+Use this only when the practice has approved destruction of the existing local
+scheduler database, configuration, certificates, and backups:
+
+```bash
+./install.sh --fresh --yes --connected --without-llm
+```
+
+The fresh workflow invokes the guarded purge before configuration, build, and
+startup. It removes only product-owned scheduler paths and resources, including
+conflicting `.runtime`, `.env`, and `certs` paths, then creates a new empty
+database and a new administrator credential. It is not an upgrade or repair
+command for a production installation that must retain data.

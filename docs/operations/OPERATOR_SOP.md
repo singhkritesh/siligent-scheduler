@@ -32,6 +32,12 @@ and waits for health. IT may use the equivalent command:
 Open the displayed HTTPS address. Do not bypass a certificate warning in
 production; ask IT to repair the internal certificate trust.
 
+On Windows with WSL, setup validates the selected distribution's
+`scripts/launch_ui.sh` before it creates the desktop shortcut. If the source
+folder is moved or renamed after installation, rerun the supported installer or
+have IT reinstall the recognized desktop launcher from the unchanged scheduler
+folder; do not edit the shortcut target manually.
+
 ## Confirm Health
 
 ```bash
@@ -255,7 +261,10 @@ supported one-command workflow only after the same disposal approval:
 It invokes the guarded purge with local-configuration and backup removal, then
 runs the standard prerequisite, configuration, build, startup, health, and
 desktop-launcher workflow. It creates a new empty scheduler database and a new
-administrator credential. Do not use it for a normal upgrade.
+administrator credential. It also removes a file or other conflicting object at
+the product-owned `.runtime`, `.env`, or `certs` paths before clean local files
+are recreated. Do not use it for a normal upgrade; it permanently destroys the
+previous scheduler data and local configuration.
 
 ## After Restart, Update, or Restore
 
