@@ -303,6 +303,8 @@ class OperationalLifecycleTests(unittest.TestCase):
         self.assertIn("desktop-launcher.lock", launcher)
         self.assertIn("desktop-launcher.log", launcher)
         self.assertIn('"$ROOT_DIR/start.sh"', launcher)
+        self.assertIn('if mkdir "$LOCK_DIR" 2>/dev/null; then', launcher)
+        self.assertIn('Treat that as an in-progress launch', launcher)
         self.assertIn("Siligent Scheduler", installer)
         for prohibited in ("patient", "condition_summary", "POSTGRES_PASSWORD"):
             self.assertNotIn(prohibited, launcher)

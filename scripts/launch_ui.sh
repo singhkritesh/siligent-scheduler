@@ -93,8 +93,14 @@ acquire_lock() {
   fi
   rm -f "$LOCK_DIR/pid" 2>/dev/null || true
   rmdir "$LOCK_DIR" 2>/dev/null || return 1
-  mkdir "$LOCK_DIR"
-  printf '%s\n' "$$" >"$LOCK_DIR/pid"
+  # Another launcher can win the race between stale-lock cleanup and this retry.
+  # Treat that as an in-progress launch; the caller will wait for health instead
+  # of surfacing a misleading "File exists" mkdir error.
+  if mkdir "$LOCK_DIR" 2>/dev/null; then
+    printf '%s\n' "$$" >"$LOCK_DIR/pid"
+    return 0
+  fi
+  return 1
 }
 
 docker_ready() {
