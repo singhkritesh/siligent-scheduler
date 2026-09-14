@@ -104,5 +104,9 @@ fi
 printf "[build] Application image is ready: %s\n" "$api_image"
 
 if [[ "$BUILD_BUNDLE" == "true" ]]; then
-  "$ROOT_DIR/scripts/build_offline_bundle.sh" "${BUNDLE_ARGS[@]}"
+  if (( ${#BUNDLE_ARGS[@]} > 0 )); then
+    "$ROOT_DIR/scripts/build_offline_bundle.sh" "${BUNDLE_ARGS[@]}"
+  else
+    "$ROOT_DIR/scripts/build_offline_bundle.sh"
+  fi
 fi

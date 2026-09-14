@@ -73,7 +73,10 @@ if [[ "$CHECK_ONLY" == "true" ]]; then
     [[ "$ALLOW_UNSIGNED" == "true" ]] && export ALLOW_UNSIGNED_DEVELOPMENT_BUNDLE=true
     "$ROOT_DIR/scripts/verify_bundle.sh" "$ROOT_DIR"
   fi
-  exec "$ROOT_DIR/setup.sh" --check "${setup_args[@]}"
+  if (( ${#setup_args[@]} > 0 )); then
+    exec "$ROOT_DIR/setup.sh" --check "${setup_args[@]}"
+  fi
+  exec "$ROOT_DIR/setup.sh" --check
 fi
 
 if [[ "$MODE" == "offline" ]]; then
@@ -86,7 +89,11 @@ else
   prerequisite_args=()
   [[ "$ASSUME_YES" == "true" ]] && prerequisite_args+=(--yes)
   [[ "$PROFILE" == "with-local-model" ]] && prerequisite_args+=(--with-local-model)
-  "$ROOT_DIR/scripts/install_prerequisites.sh" "${prerequisite_args[@]}"
+  if (( ${#prerequisite_args[@]} > 0 )); then
+    "$ROOT_DIR/scripts/install_prerequisites.sh" "${prerequisite_args[@]}"
+  else
+    "$ROOT_DIR/scripts/install_prerequisites.sh"
+  fi
 
   if ! docker info >/dev/null 2>&1; then
     if [[ "$(uname -s)" == "Darwin" && -d /Applications/Docker.app ]]; then open -a Docker >/dev/null 2>&1 || true; fi
@@ -195,7 +202,11 @@ fi
 } >"$ROOT_DIR/.runtime/install-record.pending.env"
 chmod 600 "$ROOT_DIR/.runtime/install-record.pending.env"
 
-"$ROOT_DIR/setup.sh" --skip-build "${setup_args[@]}"
+if (( ${#setup_args[@]} > 0 )); then
+  "$ROOT_DIR/setup.sh" --skip-build "${setup_args[@]}"
+else
+  "$ROOT_DIR/setup.sh" --skip-build
+fi
 if [[ "$NO_START" == "false" ]]; then
   if [[ "$MODE" == "offline" || "$FINALIZE_RUNTIME" == "true" ]]; then
     "$ROOT_DIR/verify.sh"
