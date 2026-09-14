@@ -74,7 +74,10 @@ rm -rf "$ROOT_DIR/.runtime"
 if [[ "$REMOVE_LOCAL_CONFIGURATION" == "true" ]]; then
   siligent_info 'Removing local scheduler configuration and TLS certificate/key files...'
   rm -f "$ROOT_DIR/.env"
-  if [[ -d "$ROOT_DIR/certs" ]]; then
+  if [[ -e "$ROOT_DIR/certs" && ! -d "$ROOT_DIR/certs" ]]; then
+    siligent_warn 'Removing a conflicting non-directory certificate path left by a failed installation.'
+    rm -f "$ROOT_DIR/certs"
+  elif [[ -d "$ROOT_DIR/certs" ]]; then
     find "$ROOT_DIR/certs" -maxdepth 1 -type f \( -name '*.crt' -o -name '*.key' -o -name '*.pem' \) -delete
   fi
 fi

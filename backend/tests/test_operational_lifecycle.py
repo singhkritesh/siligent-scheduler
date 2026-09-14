@@ -267,7 +267,48 @@ class OperationalLifecycleTests(unittest.TestCase):
         self.assertIn("product-owned", purge)
         self.assertIn("siligent-scheduler-api", purge)
         self.assertIn("uninstall_desktop_launcher.sh", purge)
+        self.assertIn('rm -f "$ROOT_DIR/certs"', purge)
         self.assertNotIn("system prune", purge)
+
+    def test_purge_removes_a_conflicting_certificate_file_when_requested(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            scripts = root / "scripts"
+            library = scripts / "lib"
+            fake_bin = root / "fake-bin"
+            home = root / "home"
+            library.mkdir(parents=True)
+            fake_bin.mkdir()
+            home.mkdir()
+            shutil.copy2(ROOT / "purge.sh", root / "purge.sh")
+            shutil.copy2(ROOT / "scripts" / "lib" / "common.sh", library / "common.sh")
+            shutil.copy2(
+                ROOT / "scripts" / "uninstall_desktop_launcher.sh",
+                scripts / "uninstall_desktop_launcher.sh",
+            )
+            (root / "purge.sh").chmod(0o755)
+            (scripts / "uninstall_desktop_launcher.sh").chmod(0o755)
+            (root / ".env").write_text("API_IMAGE=siligent-scheduler-api:local\n", encoding="utf-8")
+            (root / "certs").write_text("conflicting file", encoding="utf-8")
+            docker = fake_bin / "docker"
+            docker.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+            docker.chmod(0o755)
+
+            environment = os.environ | {
+                "HOME": str(home),
+                "PATH": f"{fake_bin}:{os.environ['PATH']}",
+            }
+            result = subprocess.run(
+                [str(root / "purge.sh"), "--yes", "--remove-local-configuration"],
+                cwd=root,
+                env=environment,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse((root / "certs").exists())
+            self.assertFalse((root / ".env").exists())
 
     def test_windows_native_entry_points_share_the_checked_lifecycle(self) -> None:
         install = self.read("deploy/windows/install.ps1")
